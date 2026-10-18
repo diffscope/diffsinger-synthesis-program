@@ -3,8 +3,8 @@
 #include <algorithm>
 #include <cmath>
 #include <exception>
-#include <iterator>
 #include <optional>
+#include <string>
 #include <utility>
 
 #include <dsinfer/Api/Singers/DiffSinger/1/DiffSingerApiL1.h>
@@ -87,23 +87,13 @@ namespace dssp::arch_diffsinger {
         }
 
         template <class Configuration>
-        void intersectPhonemes(const StageRecord &stage, std::optional<std::set<std::string>> &phonemes) {
+        bool acceptsPhoneme(const StageRecord &stage, const std::string &token, const std::string &qualified) {
             if (!stage.spec) {
-                return;
+                return true;
             }
 
             const auto *configuration = dynamic_cast<const Configuration *>(stage.spec->configuration());
-            std::set<std::string> available;
-            for (const auto &[token, index] : configuration->phonemes) {
-                available.insert(token);
-            }
-            if (!phonemes) {
-                phonemes = std::move(available);
-            } else {
-                std::set<std::string> common;
-                std::ranges::set_intersection(*phonemes, available, std::inserter(common, common.end()));
-                phonemes = std::move(common);
-            }
+            return configuration->phonemes.contains(qualified) || configuration->phonemes.contains(token);
         }
 
         std::expected<std::pair<SingerRecord, GroupRecord>, inference::ResourceError> readSinger(const srt::SingerSpec &singer) {
@@ -161,11 +151,6 @@ namespace dssp::arch_diffsinger {
 
             record.permitsMixing = singerMetadata(*configuration).permitsMixing;
 
-            std::optional<std::set<std::string>> phonemes;
-            intersectPhonemes<Du::DurationConfiguration>(*duration, phonemes);
-            intersectPhonemes<Pi::PitchConfiguration>(*pitch, phonemes);
-            intersectPhonemes<Va::VarianceConfiguration>(*variance, phonemes);
-            intersectPhonemes<Ac::AcousticConfiguration>(*acoustic, phonemes);
             GroupRecord groupRecord;
             auto &group = groupRecord.info;
             group.arch = Id;
@@ -190,7 +175,15 @@ namespace dssp::arch_diffsinger {
 
                 // Preserve Wolf's complete-inventory zero-coverage verdict.
                 // Unknown and open inventories do not justify dropping a route.
-                if (phonemes && !exports->openSet && !exports->phonemes.empty() && std::ranges::none_of(exports->phonemes, [&](const auto &token) { return phonemes->contains(token); })) {
+                const auto accepted = [&](const std::string &token) {
+                    // DiffSinger resolves language-qualified tokens before falling back to bare tokens in each stage.
+                    const auto qualified = handle.empty() || token == "SP" || token == "AP" ? token : handle + '/' + token;
+                    return acceptsPhoneme<Du::DurationConfiguration>(*duration, token, qualified)
+                        && acceptsPhoneme<Pi::PitchConfiguration>(*pitch, token, qualified)
+                        && acceptsPhoneme<Va::VarianceConfiguration>(*variance, token, qualified)
+                        && acceptsPhoneme<Ac::AcousticConfiguration>(*acoustic, token, qualified);
+                };
+                if (!exports->openSet && !exports->phonemes.empty() && std::ranges::none_of(exports->phonemes, accepted)) {
                     log.stdcWarning("Singer %1 language %2 has no phonemes accepted by its synthesis stages", record.info.id, handle);
                     completeLanguagePipeline = false;
                     continue;

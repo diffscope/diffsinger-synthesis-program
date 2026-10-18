@@ -232,6 +232,62 @@ namespace dssp::tests {
         }
     }
 
+    TEST_F(SingerDiscoveryTest, LanguageCoverageResolvesPhonemesInEveryStage) {
+        struct Case {
+            std::string_view name;
+            std::string_view acousticPhonemes;
+            std::string_view predictivePhonemes;
+            std::string_view exports;
+            bool accepted;
+        };
+        const Case cases[] = {
+            {"qualified", R"({"eng/a":0})", R"({"eng/a":0})", R"({"phonemes":["a"]})", true},
+            {"bare", R"({"a":0})", R"({"a":0})", R"({"phonemes":["a"]})", true},
+            {"mixed", R"({"eng/a":0})", R"({"a":0})", R"({"phonemes":["a"]})", true},
+            {"mixed reverse", R"({"a":0})", R"({"eng/a":0})", R"({"phonemes":["a"]})", true},
+            {"wrong language", R"({"cmn/a":0})", R"({"cmn/a":0})", R"({"phonemes":["a"]})", false},
+            {"disjoint stages", R"({"eng/a":0})", R"({"eng/b":0})", R"({"phonemes":["a","b"]})", false},
+            {"bare markers", R"({"SP":0,"AP":1})", R"({"SP":0,"AP":1})", R"({"phonemes":["SP","AP"]})", true},
+            {"qualified silence", R"({"eng/SP":0})", R"({"eng/SP":0})", R"({"phonemes":["SP"]})", false},
+            {"qualified breath", R"({"eng/AP":0})", R"({"eng/AP":0})", R"({"phonemes":["AP"]})", false},
+            {"partial coverage", R"({"eng/a":0})", R"({"a":0})", R"({"phonemes":["a","b"]})", true},
+            {"open inventory", R"({"eng/b":0})", R"({"eng/b":0})", R"({"phonemes":["a"],"openSet":true})", true},
+            {"unknown inventory", R"({"eng/b":0})", R"({"eng/b":0})", R"({"phonemes":[]})", true},
+        };
+        for (const auto &testCase : cases) {
+            SCOPED_TRACE(testCase.name);
+            TestFiles files;
+            writeSingerPackage(files, "coverage", "1", true);
+            files.write("coverage/phonemes.json", testCase.predictivePhonemes);
+            files.write("coverage/acoustic-phonemes.json", testCase.acousticPhonemes);
+            files.write("coverage/acoustic.json", R"({"interface":"org.openvpi.dsinfer.inference.Acoustic","variant":"onnx","level":1,
+                "exports":{"varianceControls":["energy"],"transitionControls":["gender","velocity"]},
+                "configuration":{"model":"${root}/missing-acoustic.onnx","phonemes":"acoustic-phonemes.json","parameters":["energy","gender","velocity"]}})");
+            files.write("coverage/eng.json", R"({"interface":"org.openvpi.wolf.linguist.WolfLinguist","variant":"wolf","level":1,
+                "language":"eng","scheme":"test","exports":)" + std::string(testCase.exports) + R"(,
+                "configuration":{},"imports":[{"role":"linguist/g2p","ref":":inference/g2p"}]})");
+            inference::EnvironmentOptions options;
+            options.packageRoots = {files.path()};
+            const std::filesystem::path plugins(DSSP_TEST_PLUGIN_DIR);
+            options.pluginPaths = arch_diffsinger::pluginPaths(plugins);
+            options.pluginPaths.push_back({"inference", plugins / "dsinfer" / "inferenceinterpreters"});
+            options.pluginPaths.push_back({"inference", plugins / "wolf" / "inferenceinterpreters"});
+            options.pluginPaths.push_back({"linguist", plugins / "wolf" / "linguistproviders"});
+            const auto host = inference::Environment::create(options);
+            ASSERT_TRUE(host) << (host ? "" : host.error().formatChain());
+            ASSERT_TRUE((*host)->problems().empty()) << ((*host)->problems().empty() ? "" : (*host)->problems().front().error.formatChain());
+            const auto catalog = arch_diffsinger::SingerCatalog::discover(*host);
+            ASSERT_TRUE(catalog) << (catalog ? "" : catalog.error().formatChain());
+            ASSERT_EQ((*catalog)->singers().size(), 2U);
+            for (const auto &[id, singer] : (*catalog)->singers()) {
+                SCOPED_TRACE(id);
+                EXPECT_EQ(singer.languages.contains("eng"), testCase.accepted);
+                EXPECT_EQ(singer.info.defaultLanguage, testCase.accepted ? "eng" : "");
+                EXPECT_EQ((*catalog)->groups().at(singer.info.group).info.languages.contains("eng"), testCase.accepted);
+            }
+        }
+    }
+
     TEST_F(SingerDiscoveryTest, MediaUsesRawBytesAndNegotiationWhileAbsentOptionalResourcesAreEmpty) {
         const auto singers = m_implementation->singers({});
         ASSERT_TRUE(singers);

@@ -195,7 +195,7 @@ namespace dssp {
     }
 
     stdc::cli::Command serveCommand = [] {
-        auto command = stdc::cli::Command{"serve", "Start the server"}
+        auto command = stdc::cli::Command{"serve", "Start the server. This server supports RFC 9727 discovery. Use --help on this command to see more options."}
             .addHelpOption()
             .addOption(stdc::cli::Option({"--host"}, "Host to listen on (DSSP_HOST)").arg("host"))
             .addOption(stdc::cli::Option({"--port"}, "Nonzero listening port (DSSP_PORT)").arg("port"))

@@ -1,6 +1,7 @@
 #include "Controllers.h"
 
 #include <dsspapiv1/ArchitectureDispatch.h>
+#include <dsspapiv1/DiscoveryController.h>
 #include <dsspapiv1/ExtractionDispatch.h>
 
 namespace dssp::api_v1 {
@@ -152,6 +153,7 @@ namespace dssp::api_v1 {
     }
 
     void registerControllers(drogon::HttpAppFramework &app, const std::shared_ptr<http::RequestLifetimeRegistry> &lifetime, const std::shared_ptr<const arch::ArchitectureCatalog> &architectures, const std::shared_ptr<extraction::Service> &extraction, std::chrono::seconds heartbeatInterval) {
+        app.registerController(std::make_shared<DiscoveryController>());
         app.registerController(std::make_shared<ApplicationController>());
         app.registerController(std::make_shared<CatalogController>(architectures));
         app.registerController(std::make_shared<SynthesisController>(lifetime, architectures, heartbeatInterval));

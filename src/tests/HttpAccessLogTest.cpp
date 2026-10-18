@@ -216,6 +216,12 @@ namespace dssp::tests {
         };
 
         std::vector<Case> cases{
+            {drogon::Get, "/.well-known/api-catalog", {}, 200},
+            {drogon::Head, "/.well-known/api-catalog", {}, 200},
+            {drogon::Post, "/.well-known/api-catalog", {}, 405},
+            {drogon::Get, "/v1/openapi.json", {}, 200, "application/json", "openapi", "3.2.0"},
+            {drogon::Head, "/v1/openapi.json", {}, 200},
+            {drogon::Post, "/v1/openapi.json", {}, 405},
             {drogon::Get, "/v1/info", {}, 200},
             {drogon::Head, "/v1/info", {}, 200},
             {drogon::Get, "/v1/singer", {}, 200},
@@ -266,6 +272,7 @@ namespace dssp::tests {
         cases.push_back({drogon::Get, queryPath, {}, 422, "application/json", {}, {}, false, "acceptableFormats=application%2Fvnd.example+json"});
         cases.push_back({drogon::Get, queryPath, {}, 422, "application/json", {}, {}, false, "acceptableFormats=application%2Fvnd.example%252Bjson"});
         std::set<std::string> ids;
+        std::string catalogLength, specificationLength;
         for (std::size_t i = 0; i < cases.size(); ++i) {
             const auto &item = cases[i];
             auto request = drogon::HttpRequest::newHttpRequest();
@@ -290,6 +297,27 @@ namespace dssp::tests {
             ASSERT_EQ(result, drogon::ReqResult::Ok);
             ASSERT_NE(response, nullptr);
             EXPECT_EQ(static_cast<int>(response->statusCode()), item.status);
+            if (item.status == 200 && item.path == "/.well-known/api-catalog") {
+                EXPECT_EQ(response->contentTypeString(), "application/linkset+json; profile=\"https://www.rfc-editor.org/info/rfc9727\"");
+                EXPECT_EQ(response->getHeader("link"), "</.well-known/api-catalog>; rel=\"api-catalog\"; type=\"application/linkset+json\"");
+                if (item.method == drogon::Get) {
+                    catalogLength = std::to_string(response->body().size());
+                    EXPECT_FALSE(response->body().empty());
+                } else {
+                    EXPECT_TRUE(response->body().empty());
+                }
+                EXPECT_EQ(response->getHeader("content-length"), catalogLength);
+            }
+            if (item.status == 200 && item.path == "/v1/openapi.json") {
+                EXPECT_EQ(response->contentTypeString(), "application/json");
+                if (item.method == drogon::Get) {
+                    specificationLength = std::to_string(response->body().size());
+                    EXPECT_FALSE(response->body().empty());
+                } else {
+                    EXPECT_TRUE(response->body().empty());
+                }
+                EXPECT_EQ(response->getHeader("content-length"), specificationLength);
+            }
             if (!item.jsonField.empty()) {
                 const auto json = response->getJsonObject();
                 ASSERT_NE(json, nullptr);

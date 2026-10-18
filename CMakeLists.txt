@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.19)
 project(dssp
     VERSION 0.1.0
     LANGUAGES CXX
-    DESCRIPTION "DSSP - DiffSinger Synthesis Program"
+    DESCRIPTION "DSSP - DiffSinger Synthesis Program: A service that provides DiffSinger singing voice synthesis and audio analysis through the DiffScope Synthesis Platform API"
 )
 
 # ----------------------------------

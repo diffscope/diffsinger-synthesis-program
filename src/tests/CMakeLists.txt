@@ -19,6 +19,7 @@ add_executable(dssp_tests
     ResponseTest.cpp
     ResponseNegotiationTest.cpp
     ControllerTest.cpp
+    DiscoveryTest.cpp
     ArchitectureDispatchTest.cpp
     ArchitectureMappingTest.cpp
     ArchitectureCatalogTest.cpp
@@ -35,6 +36,7 @@ add_executable(dssp_tests
 
 target_compile_features(dssp_tests PRIVATE cxx_std_23)
 target_link_libraries(dssp_tests PRIVATE dssp_api_v1 dssp_runtime GTest::gtest_main)
+target_compile_definitions(dssp_tests PRIVATE DSSP_TEST_OPENAPI_FILE="${DSSP_SOURCE_DIR}/docs/open-api/1.0.json")
 
 dssp_sync_include(dssp_tests PREFIX dssptests FORCE NO_INSTALL)
 

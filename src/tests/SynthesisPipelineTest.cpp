@@ -196,7 +196,7 @@ namespace dssp::tests {
         auto order = std::make_shared<std::vector<std::string>>();
         install<PitchExecutive>(Stage::Pitch, [order](const auto &input) {
             order->push_back("pitch");
-            EXPECT_EQ(input.steps, 20);
+            EXPECT_EQ(input.steps, 12);
             const auto *pitch = curve(input.parameters, "pitch");
             EXPECT_NE(pitch, nullptr);
             if (pitch && pitch->retake) {
@@ -211,6 +211,7 @@ namespace dssp::tests {
         });
         install<VarianceExecutive>(Stage::Variance, [order](const auto &input) {
             order->push_back("variance");
+            EXPECT_EQ(input.steps, 24);
             const auto *pitch = curve(input.parameters, "pitch");
             EXPECT_NE(pitch, nullptr);
             if (pitch && pitch->values.size() == 50) {
@@ -225,6 +226,9 @@ namespace dssp::tests {
             return result;
         });
         auto input = parameterInput();
+        input.context.archExtra["steps"]["pitch"] = 12;
+        input.context.archExtra["steps"]["variance"] = 24;
+        input.context.archExtra["steps"]["acoustic"] = 36;
         std::vector<double> progress;
         input.progress = resource::TaskProgress([&](resource::TaskUpdate update) {
             if (update.state == resource::TaskUpdate::State::Progress && update.value > 0) progress.push_back(update.value);
@@ -297,7 +301,9 @@ namespace dssp::tests {
         });
         arch::AudioInput input;
         input.context = m_context;
-        input.context.archExtra["steps"] = 30;
+        input.context.archExtra["steps"]["pitch"] = 12;
+        input.context.archExtra["steps"]["variance"] = 24;
+        input.context.archExtra["steps"]["acoustic"] = 30;
         input.context.archExtra["depth"] = 0.75;
         input.piece = piece();
         for (const auto id : {"pitch", "energy", "gender", "velocity", "tone_shift"}) input.parameters.emplace(id, arch::AudioParameter{100, std::nullopt});

@@ -331,7 +331,7 @@ namespace dssp::arch_diffsinger {
 
                 auto task = std::make_shared<Pi::PitchStartInput>();
                 task->duration = duration;
-                task->steps = context.options.steps;
+                task->steps = context.options.steps.pitch;
                 task->words = std::move(pitchScore.words);
                 task->speakers = std::move(pitchScore.speakers);
                 task->parameters.push_back(curves.at("pitch"));
@@ -385,7 +385,7 @@ namespace dssp::arch_diffsinger {
 
                 auto task = std::make_shared<Va::VarianceStartInput>();
                 task->duration = duration;
-                task->steps = context.options.steps;
+                task->steps = context.options.steps.variance;
                 task->words = std::move(varianceScore.words);
                 task->speakers = std::move(varianceScore.speakers);
                 task->parameters.push_back(std::move(*pitchCurve));
@@ -520,7 +520,7 @@ namespace dssp::arch_diffsinger {
 
                 auto task = std::make_shared<Ac::AcousticStartInput>();
                 task->duration = duration;
-                task->steps = context.options.steps;
+                task->steps = context.options.steps.acoustic;
                 task->depth = context.options.depth;
                 task->words = std::move(acousticScore.words);
                 task->speakers = std::move(acousticScore.speakers);

@@ -13,8 +13,14 @@ namespace dssp::arch_diffsinger {
         std::string speaker;
     };
 
+    struct SynthesisSteps {
+        std::int64_t pitch = 20;
+        std::int64_t variance = 20;
+        std::int64_t acoustic = 20;
+    };
+
     struct SynthesisOptions {
-        std::int64_t steps = 20;
+        SynthesisSteps steps;
         float depth = 1;
     };
 

@@ -53,6 +53,7 @@ namespace dssp::api_v1::dto {
         std::string id;
         std::string name;
         std::map<std::string, ParameterPresentation> parameters;
+        Json::Value defaultArchExtra;
     };
 
     enum class PronunciationMode {
@@ -99,7 +100,6 @@ namespace dssp::api_v1::dto {
         std::vector<std::string> audioDependencies;
         bool mixable = false;
         Json::Value archSpecificInfo;
-        Json::Value defaultArchExtra;
     };
 
     struct SingerInfo {

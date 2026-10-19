@@ -134,7 +134,7 @@ namespace dssp::api_v1 {
     }
 
     dto::ArchitectureMetadata toDto(arch::ArchitectureMetadata value) {
-        return {std::move(value.id), std::move(value.name), toDto(std::move(value.parameters))};
+        return {std::move(value.id), std::move(value.name), toDto(std::move(value.parameters)), std::move(value.defaultArchExtra)};
     }
 
     dto::GroupMetadata toDto(arch::GroupMetadata value) {
@@ -164,7 +164,6 @@ namespace dssp::api_v1 {
         result.audioDependencies = std::move(value.audioDependencies);
         result.mixable = value.mixable;
         result.archSpecificInfo = std::move(value.archSpecificInfo);
-        result.defaultArchExtra = std::move(value.defaultArchExtra);
         return result;
     }
 

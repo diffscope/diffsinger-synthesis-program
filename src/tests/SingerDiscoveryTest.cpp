@@ -108,6 +108,9 @@ namespace dssp::tests {
             EXPECT_EQ(singer.arch, "diffsinger");
             EXPECT_EQ(singer.defaultLanguage, "eng");
             EXPECT_TRUE(singer.archSpecificInfo.isMember("speakers"));
+            EXPECT_TRUE(singer.archSpecificInfo["speakers"].isArray());
+            EXPECT_TRUE(singer.archSpecificInfo["speakers"].empty());
+            EXPECT_EQ(singer.defaultExtra["speaker"].asString(), "");
             EXPECT_FALSE(singer.archSpecificInfo.isMember("hasDuration"));
             EXPECT_FALSE(singer.archSpecificInfo.isMember("languageCapabilities"));
             const auto group = m_implementation->group({singer.group, {}});
@@ -165,8 +168,6 @@ namespace dssp::tests {
             EXPECT_EQ(group.durationMode, arch::DurationMode::Skip);
             EXPECT_TRUE(group.archSpecificInfo.isObject());
             EXPECT_TRUE(group.archSpecificInfo.empty());
-            EXPECT_EQ(group.defaultArchExtra["steps"].asInt(), 20);
-            EXPECT_EQ(group.defaultArchExtra["depth"].asDouble(), 1);
             EXPECT_TRUE(std::holds_alternative<arch::DirectParameter>(group.parameterPipeline.at("pitch")));
             EXPECT_TRUE(group.parameterPipeline.contains("gender"));
             EXPECT_TRUE(group.parameterPipeline.contains("velocity"));
@@ -189,6 +190,11 @@ namespace dssp::tests {
     TEST_F(SingerDiscoveryTest, PredictiveStageDeclarationsExposeDurationAndRangeRetakesWithoutLoadingModels) {
         TestFiles predictive;
         writeSingerPackage(predictive, "predictive", "1", true);
+        predictive.write("predictive/acoustic.json", R"({"interface":"org.openvpi.dsinfer.inference.Acoustic","variant":"onnx","level":1,
+            "exports":{"speakers":["main","soft"],"varianceControls":["energy"],"transitionControls":["gender","velocity"]},
+            "configuration":{"model":"${root}/missing-acoustic.onnx","phonemes":"phonemes.json","parameters":["energy","gender","velocity"],
+                "useSpeakerEmbedding":true,"hiddenSize":1,"speakers":{"main":"voice.emb","soft":"voice.emb"}}})");
+        predictive.write("predictive/voice.emb", std::string(sizeof(float), '\0'));
         inference::EnvironmentOptions options;
         options.packageRoots = {predictive.path()};
         const std::filesystem::path plugins(DSSP_TEST_PLUGIN_DIR);
@@ -225,6 +231,18 @@ namespace dssp::tests {
                 EXPECT_EQ((*pool)->residentCount(), 0U);
             }
             EXPECT_EQ(singer.info.defaultLanguage, "eng");
+            const auto &speakers = singer.info.archSpecificInfo["speakers"];
+            ASSERT_TRUE(speakers.isArray());
+            ASSERT_EQ(speakers.size(), 2U);
+            for (Json::ArrayIndex i = 0; i < speakers.size(); ++i) {
+                ASSERT_TRUE(speakers[i].isObject());
+                EXPECT_EQ(speakers[i].size(), 2U);
+                ASSERT_TRUE(speakers[i]["id"].isString());
+                ASSERT_TRUE(speakers[i]["name"].isString());
+                EXPECT_EQ(speakers[i]["id"].asString(), i == 0 ? "main" : "soft");
+                EXPECT_EQ(speakers[i]["name"], speakers[i]["id"]);
+            }
+            EXPECT_EQ(singer.info.defaultExtra["speaker"].asString(), "main");
             for (const auto stage : {"duration", "pitch", "variance"}) {
                 EXPECT_FALSE(std::filesystem::exists(singer.package.path() / (std::string("missing-") + stage + "-encoder.onnx")));
                 EXPECT_FALSE(std::filesystem::exists(singer.package.path() / (std::string("missing-") + stage + "-predictor.onnx")));

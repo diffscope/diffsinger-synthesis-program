@@ -88,7 +88,6 @@ namespace dssp::tests {
             group.audioDependencies = {"pitch"};
             group.archSpecificInfo = Json::Value(Json::arrayValue);
             group.archSpecificInfo.append("shared pipeline");
-            group.defaultArchExtra = 7;
             return group;
         };
 
@@ -225,7 +224,8 @@ namespace dssp::tests {
             {drogon::Get, "/v1/info", {}, 200},
             {drogon::Head, "/v1/info", {}, 200},
             {drogon::Get, "/v1/singer", {}, 200},
-            {drogon::Get, "/v1/arch/diffsinger", {}, 200},
+            {drogon::Get, "/v1/arch", {}, 200, "application/json", "id", "diffsinger", true},
+            {drogon::Get, "/v1/arch/diffsinger", {}, 200, "application/json", "id", "diffsinger"},
             {drogon::Get, "/v1/arch/diffsinger/group", {}, 200, "application/json", "id", "group", true, {}, true, "ja-JP"},
             {drogon::Get, "/v1/arch/diffsinger/group/group", {}, 200, "application/json", "id", "group", false, {}, true, "ja-JP"},
             {drogon::Get, "/v1/arch/diffsinger/group/missing", {}, 404},
@@ -339,9 +339,12 @@ namespace dssp::tests {
                     EXPECT_EQ(object["durationMode"].asString(), "full");
                     EXPECT_EQ(object["parameterPipeline"]["pitch"]["retakeMode"].asString(), "range");
                     EXPECT_EQ(object["archSpecificInfo"][0].asString(), "shared pipeline");
-                    EXPECT_EQ(object["defaultArchExtra"].asInt(), 7);
+                    EXPECT_FALSE(object.isMember("defaultArchExtra"));
                     EXPECT_FALSE(object.isMember("pronunciationMode"));
                     EXPECT_FALSE(object.isMember("phonemeMode"));
+                } else if (item.path == "/v1/arch" || item.path == "/v1/arch/diffsinger") {
+                    EXPECT_TRUE(object.isMember("defaultArchExtra"));
+                    EXPECT_TRUE(object["defaultArchExtra"].isNull());
                 } else if (item.jsonField == "id" && item.path.find("/singer/") != std::string::npos) {
                     EXPECT_FALSE(object.isMember("languages"));
                     EXPECT_EQ(object["defaultLanguage"].asString(), "eng");

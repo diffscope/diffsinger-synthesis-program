@@ -63,7 +63,8 @@ namespace dssp::arch_diffsinger {
             const srt::JsonValue effective(srt::JsonObject{
                 {"contract", "dssp.diffsinger.synthesis.1;pitch=128;normalized-controls;seconds;native-retake-ranges"},
                 {"programVersion", DSSP_PROGRAM_VERSION}, {"synthrtRevision", DSSP_SYNTHRT_REVISION}, {"wolfRevision", DSSP_WOLF_REVISION},
-                {"steps", context->options.steps}, {"depth", static_cast<double>(context->options.depth)},
+                {"steps", srt::JsonObject{{"pitch", context->options.steps.pitch}, {"variance", context->options.steps.variance}, {"acoustic", context->options.steps.acoustic}}},
+                {"depth", static_cast<double>(context->options.depth)},
                 {"sources", std::move(sources)}, {"packages", std::move(packageIdentities)}
             });
             const auto digest = inference::fingerprint(effective.toJson());

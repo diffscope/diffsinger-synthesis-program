@@ -61,6 +61,7 @@ namespace dssp::api_v1 {
         result["id"] = value.id;
         result["name"] = value.name;
         result["parameters"] = toJson(value.parameters);
+        result["defaultArchExtra"] = value.defaultArchExtra;
         return result;
     }
 
@@ -90,7 +91,6 @@ namespace dssp::api_v1 {
         result["audioDependencies"] = toJson(value.audioDependencies);
         result["mixable"] = value.mixable;
         result["archSpecificInfo"] = value.archSpecificInfo;
-        result["defaultArchExtra"] = value.defaultArchExtra;
         return result;
     }
 

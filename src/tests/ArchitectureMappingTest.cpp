@@ -13,7 +13,9 @@ namespace dssp::tests {
     TEST(ArchitectureMapping, ParameterInputRetainsSourceOrderAndIndependentSamplingGrids) {
         api_v1::dto::ParameterRequest request;
         request.context.arch = "diffsinger";
-        request.context.archExtra["steps"] = 24;
+        request.context.archExtra["steps"]["pitch"] = 12;
+        request.context.archExtra["steps"]["variance"] = 24;
+        request.context.archExtra["steps"]["acoustic"] = 36;
         api_v1::dto::Singer lead{"lead", Json::Value{}};
         lead.extra["speaker"] = "soft";
         request.context.singers = {std::move(lead), {"backing", Json::Value{}}};
@@ -38,7 +40,9 @@ namespace dssp::tests {
         EXPECT_EQ(input.context.singers[1].id, "backing");
         EXPECT_EQ(input.context.singers[0].extra["speaker"].asString(), "soft");
         EXPECT_TRUE(input.context.singers[1].extra.isNull());
-        EXPECT_EQ(input.context.archExtra["steps"].asInt(), 24);
+        EXPECT_EQ(input.context.archExtra["steps"]["pitch"].asInt(), 12);
+        EXPECT_EQ(input.context.archExtra["steps"]["variance"].asInt(), 24);
+        EXPECT_EQ(input.context.archExtra["steps"]["acoustic"].asInt(), 36);
         EXPECT_DOUBLE_EQ(input.piece.pieceDuration, 1250.5);
         EXPECT_EQ(input.piece.mix, (std::vector<std::vector<double>>{{0.25, 0.75}, {0.8, 0.2}}));
         EXPECT_DOUBLE_EQ(input.piece.mixSampleRate, 37);
@@ -118,7 +122,7 @@ namespace dssp::tests {
         arch::ParameterPresentation parameter;
         parameter.fillMode = arch::FillMode::Baseline;
         parameter.displayValueMappingExpression.value = arch::AST::Operation{"*", {arch::AST{12800.0}, arch::AST{arch::AST::Operation{"x", {}}}}};
-        const auto metadata = api_v1::toJson(api_v1::toDto(arch::ArchitectureMetadata{"diffsinger", "DiffSinger", {{"pitch", std::move(parameter)}}}));
+        const auto metadata = api_v1::toJson(api_v1::toDto(arch::ArchitectureMetadata{"diffsinger", "DiffSinger", {{"pitch", std::move(parameter)}}, {}}));
         EXPECT_EQ(metadata["id"].asString(), "diffsinger");
         const auto &presentation = metadata["parameters"]["pitch"];
         EXPECT_EQ(presentation["fillMode"].asString(), "baseline");
@@ -162,7 +166,7 @@ namespace dssp::tests {
         EXPECT_FALSE(body["mixable"].asBool());
     }
 
-    TEST(ArchitectureMapping, GroupExtensionsRetainEveryJsonTypeIncludingNull) {
+    TEST(ArchitectureMapping, CatalogExtensionsRetainEveryJsonTypeIncludingNull) {
         Json::Value array(Json::arrayValue), object(Json::objectValue);
         array.append("item");
         object["nested"] = array;
@@ -171,12 +175,15 @@ namespace dssp::tests {
             SCOPED_TRACE(i);
             arch::GroupMetadata group;
             group.archSpecificInfo = values[i];
-            group.defaultArchExtra = values[values.size() - 1 - i];
             const auto body = api_v1::toJson(api_v1::toDto(std::move(group)));
             EXPECT_TRUE(body.isMember("archSpecificInfo"));
-            EXPECT_TRUE(body.isMember("defaultArchExtra"));
+            EXPECT_FALSE(body.isMember("defaultArchExtra"));
             EXPECT_EQ(body["archSpecificInfo"], values[i]);
-            EXPECT_EQ(body["defaultArchExtra"], values[values.size() - 1 - i]);
+            arch::ArchitectureMetadata architecture;
+            architecture.defaultArchExtra = values[i];
+            const auto metadata = api_v1::toJson(api_v1::toDto(std::move(architecture)));
+            EXPECT_TRUE(metadata.isMember("defaultArchExtra"));
+            EXPECT_EQ(metadata["defaultArchExtra"], values[i]);
         }
     }
 

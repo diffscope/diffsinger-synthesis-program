@@ -1,16 +1,75 @@
 #include <chrono>
 #include <future>
+#include <limits>
+#include <string>
+#include <vector>
 
 #include <gtest/gtest.h>
 
 #include <dssparchdiffsinger/DiffSinger.h>
 #include <dssparchdiffsinger/Factory.h>
+#include <dssparchdiffsinger/SynthesisContext.h>
 #include <dssparchdiffsinger/SynthesisInferences.h>
 #include <dssparchdiffsinger/SynthesisScore.h>
 #include <dssptests/TestLanguagePackage.h>
 
 namespace dssp::tests {
     using namespace std::chrono_literals;
+
+    TEST(SynthesisOptions, StageStepsDefaultIndependently) {
+        Json::Value extra(Json::objectValue);
+        for (const auto stage : {"pitch", "variance", "acoustic"}) {
+            extra["steps"] = Json::Value(Json::objectValue);
+            extra["steps"][stage] = 30;
+            const auto options = arch_diffsinger::synthesisOptions(extra);
+            ASSERT_TRUE(options);
+            EXPECT_EQ(options->steps.pitch, extra["steps"].isMember("pitch") ? 30 : 20);
+            EXPECT_EQ(options->steps.variance, extra["steps"].isMember("variance") ? 30 : 20);
+            EXPECT_EQ(options->steps.acoustic, extra["steps"].isMember("acoustic") ? 30 : 20);
+        }
+        for (const bool includeSteps : {false, true}) {
+            extra = Json::Value(Json::objectValue);
+            if (includeSteps) extra["steps"] = Json::Value(Json::objectValue);
+            const auto options = arch_diffsinger::synthesisOptions(extra);
+            ASSERT_TRUE(options);
+            EXPECT_EQ(options->steps.pitch, 20);
+            EXPECT_EQ(options->steps.variance, 20);
+            EXPECT_EQ(options->steps.acoustic, 20);
+            EXPECT_FLOAT_EQ(options->depth, 1);
+        }
+    }
+
+    TEST(SynthesisOptions, InvalidStepsReturnTypedInputErrors) {
+        Json::Value extra(Json::objectValue);
+        for (const auto &invalid : {Json::Value(), Json::Value(20), Json::Value("20"), Json::Value(true), Json::Value(Json::arrayValue)}) {
+            extra["steps"] = invalid;
+            const auto options = arch_diffsinger::synthesisOptions(extra);
+            ASSERT_FALSE(options);
+            EXPECT_NE(options.error().get_if<arch::InvalidInputError>(), nullptr);
+        }
+        for (const auto stage : {"pitch", "variance", "acoustic"}) {
+            for (const auto &invalid : {Json::Value(), Json::Value(0), Json::Value(-1), Json::Value(1.5), Json::Value("20"), Json::Value(true), Json::Value(Json::arrayValue), Json::Value(Json::objectValue), Json::Value(std::numeric_limits<Json::UInt64>::max())}) {
+                extra["steps"] = Json::Value(Json::objectValue);
+                extra["steps"][stage] = invalid;
+                const auto options = arch_diffsinger::synthesisOptions(extra);
+                ASSERT_FALSE(options) << stage;
+                EXPECT_NE(options.error().get_if<arch::InvalidInputError>(), nullptr);
+            }
+        }
+    }
+
+    TEST(SynthesisOptions, StageStepsAcceptSigned64BitLimits) {
+        Json::Value extra(Json::objectValue);
+        extra["steps"]["pitch"] = Json::Int64{1};
+        extra["steps"]["variance"] = std::numeric_limits<Json::Int64>::max();
+        extra["steps"]["acoustic"] = Json::Int64{30};
+        const auto options = arch_diffsinger::synthesisOptions(extra);
+        ASSERT_TRUE(options);
+        EXPECT_EQ(options->steps.pitch, 1);
+        EXPECT_EQ(options->steps.variance, std::numeric_limits<Json::Int64>::max());
+        EXPECT_EQ(options->steps.acoustic, 30);
+    }
+
     class SynthesisTest : public ::testing::Test {
     protected:
         void SetUp() override {
@@ -237,17 +296,28 @@ namespace dssp::tests {
         const auto tag = m_implementation->envTag(m_context);
         ASSERT_TRUE(tag);
         EXPECT_TRUE(tag->starts_with("ds1."));
+        auto emptySteps = m_context;
+        emptySteps.archExtra["steps"] = Json::Value(Json::objectValue);
+        const auto emptyStepsTag = m_implementation->envTag(emptySteps);
+        ASSERT_TRUE(emptyStepsTag);
+        EXPECT_EQ(*tag, *emptyStepsTag);
         auto explicitDefaults = m_context;
-        explicitDefaults.archExtra["steps"] = 20;
+        for (const auto stage : {"pitch", "variance", "acoustic"}) explicitDefaults.archExtra["steps"][stage] = 20;
         explicitDefaults.archExtra["depth"] = 1;
         explicitDefaults.singers[0].extra["speaker"] = "";
         const auto same = m_implementation->envTag(explicitDefaults);
         ASSERT_TRUE(same);
         EXPECT_EQ(*tag, *same);
-        explicitDefaults.archExtra["steps"] = 21;
-        const auto changed = m_implementation->envTag(explicitDefaults);
-        ASSERT_TRUE(changed);
-        EXPECT_NE(*tag, *changed);
+        std::vector<std::string> changedTags;
+        for (const auto stage : {"pitch", "variance", "acoustic"}) {
+            auto changedContext = explicitDefaults;
+            changedContext.archExtra["steps"][stage] = 21;
+            const auto changed = m_implementation->envTag(changedContext);
+            ASSERT_TRUE(changed);
+            EXPECT_NE(*tag, *changed);
+            for (const auto &previous : changedTags) EXPECT_NE(previous, *changed);
+            changedTags.push_back(*changed);
+        }
         auto unknown = m_context;
         unknown.singers[0].id = "missing";
         EXPECT_FALSE(m_implementation->envTag(unknown));

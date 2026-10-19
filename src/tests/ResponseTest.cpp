@@ -41,8 +41,10 @@ namespace dssp::tests {
         EXPECT_TRUE(group["audioDependencies"].isArray());
         EXPECT_TRUE(group.isMember("archSpecificInfo"));
         EXPECT_TRUE(group["archSpecificInfo"].isNull());
-        EXPECT_TRUE(group.isMember("defaultArchExtra"));
-        EXPECT_TRUE(group["defaultArchExtra"].isNull());
+        EXPECT_FALSE(group.isMember("defaultArchExtra"));
+        const auto architecture = api_v1::toJson(api_v1::dto::ArchitectureMetadata{});
+        EXPECT_TRUE(architecture.isMember("defaultArchExtra"));
+        EXPECT_TRUE(architecture["defaultArchExtra"].isNull());
     }
 
     TEST(Response, ValidationProblemsContainReasonsAndPointers) {

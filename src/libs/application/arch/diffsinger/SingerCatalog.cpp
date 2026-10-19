@@ -156,9 +156,6 @@ namespace dssp::arch_diffsinger {
             group.arch = Id;
             group.durationMode = duration->spec ? arch::DurationMode::Full : arch::DurationMode::Skip;
             group.archSpecificInfo = Json::Value(Json::objectValue);
-            group.defaultArchExtra = Json::Value(Json::objectValue);
-            group.defaultArchExtra["steps"] = 20;
-            group.defaultArchExtra["depth"] = 1;
             bool completeLanguagePipeline = false;
             std::map<std::string, Depth> languageDepths;
             completeLanguagePipeline = !singer.languages().empty();
@@ -315,7 +312,10 @@ namespace dssp::arch_diffsinger {
             record.info.archSpecificInfo = Json::Value(Json::objectValue);
             record.info.archSpecificInfo["speakers"] = Json::Value(Json::arrayValue);
             for (const auto &speaker : record.speakers) {
-                record.info.archSpecificInfo["speakers"].append(speaker);
+                Json::Value info(Json::objectValue);
+                info["id"] = speaker;
+                info["name"] = speaker;
+                record.info.archSpecificInfo["speakers"].append(std::move(info));
             }
 
             record.info.defaultExtra = Json::Value(Json::objectValue);

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 namespace dssp::arch_diffsinger {
     arch::SynthesisResult<SynthesisOptions> synthesisOptions(const Json::Value &extra) {
@@ -12,10 +13,19 @@ namespace dssp::arch_diffsinger {
         SynthesisOptions result;
         if (extra.isMember("steps")) {
             const auto &steps = extra["steps"];
-            if (!steps.isIntegral() || !steps.isInt64() || steps.asInt64() <= 0) {
-                return fail<arch::SynthesisErrors>(arch::InvalidInputError("DiffSinger steps must be a positive signed 64-bit integer"));
+            if (!steps.isObject()) {
+                return fail<arch::SynthesisErrors>(arch::InvalidInputError("DiffSinger steps must be an object"));
             }
-            result.steps = steps.asInt64();
+            for (const auto &[stage, target] : {std::pair{"pitch", &result.steps.pitch}, std::pair{"variance", &result.steps.variance}, std::pair{"acoustic", &result.steps.acoustic}}) {
+                if (!steps.isMember(stage)) {
+                    continue;
+                }
+                const auto &value = steps[stage];
+                if (!value.isIntegral() || !value.isInt64() || value.asInt64() <= 0) {
+                    return fail<arch::SynthesisErrors>(arch::InvalidInputError("DiffSinger steps." + std::string(stage) + " must be a positive signed 64-bit integer"));
+                }
+                *target = value.asInt64();
+            }
         }
 
         if (extra.isMember("depth")) {

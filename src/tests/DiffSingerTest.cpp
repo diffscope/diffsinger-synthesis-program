@@ -57,6 +57,11 @@ namespace dssp::tests {
         EXPECT_EQ(metadata->id, "diffsinger");
         EXPECT_EQ(metadata->name, "DiffSinger");
         EXPECT_EQ(metadata->parameters.size(), 10U);
+        ASSERT_TRUE(metadata->defaultArchExtra.isObject());
+        EXPECT_EQ(metadata->defaultArchExtra["steps"]["pitch"].asInt(), 20);
+        EXPECT_EQ(metadata->defaultArchExtra["steps"]["variance"].asInt(), 20);
+        EXPECT_EQ(metadata->defaultArchExtra["steps"]["acoustic"].asInt(), 20);
+        EXPECT_EQ(metadata->defaultArchExtra["depth"].asDouble(), 1);
         for (const auto id : {"pitch", "expressiveness", "energy", "breathiness", "voicing", "tension", "mouth_opening", "gender", "velocity", "tone_shift"}) {
             EXPECT_TRUE(metadata->parameters.contains(id));
             const auto *definition = arch_diffsinger::parameterDefinition(id);

@@ -118,7 +118,7 @@ namespace dssp::arch_diffsinger {
             drogon::Task<bool> background() {
                 auto ready = co_await tasks.resume(stop);
                 if (!ready) {
-                    if (ready.error().get_if<resource::TaskCancelledError>()) {
+                    if (ready.error().template get_if<resource::TaskCancelledError>()) {
                         finish(fail<arch::SynthesisErrors>(arch::CancelledError("DiffSinger background task was cancelled")));
                     } else {
                         finish(fail<arch::SynthesisErrors>(arch::OperationError("Cannot execute DiffSinger background task", ready.error().asError().clone())));

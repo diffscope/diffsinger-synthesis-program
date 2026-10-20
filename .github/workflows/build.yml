@@ -75,7 +75,7 @@ jobs:
     env:
       VCPKG_REF: 39344dff01c5a5a0134caf2624cdd492f05d30ea
       VCPKG_DISABLE_METRICS: '1'
-      MACOSX_DEPLOYMENT_TARGET: '13.0'
+      MACOSX_DEPLOYMENT_TARGET: '13.3'
       BUILD_DIR: ${{ github.workspace }}/build/build
       INSTALL_DIR: ${{ github.workspace }}/build/install
       CCACHE_DIR: ${{ github.workspace }}/build/ccache

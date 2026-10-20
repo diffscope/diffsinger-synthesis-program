@@ -36,17 +36,19 @@ function(dssp_deploy_inference_plugins target)
         endif()
     endforeach()
 
-    # srtsepinfer is built by this project. Staging must follow its target and
-    # re-run even when only the manifest changed or a deployed file was removed.
+    # Stage copies of project libraries and interpreters because deployment rewrites
+    # runtime paths. CMake installation requires the unmodified target binaries.
     set(_separation_destination "${_plugin_root}/srtsepinfer/inferenceinterpreters/demucs")
     add_custom_target(srtsepinfer_deploy_plugins
-        COMMAND "${CMAKE_COMMAND}" -E make_directory "${_separation_destination}"
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "${_dependency_dir}" "${_separation_destination}"
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+            "$<TARGET_FILE:srtsepinfer>" "${_dependency_dir}/$<TARGET_FILE_NAME:srtsepinfer>"
         COMMAND "${CMAKE_COMMAND}" -E copy_if_different
             "$<TARGET_FILE:srtsepinferdemucs>" "${_separation_destination}/$<TARGET_FILE_NAME:srtsepinferdemucs>"
         COMMAND "${CMAKE_COMMAND}" -E copy_if_different
             "${SRTSEPINFER_PLUGIN_MANIFEST}" "${_separation_destination}/plugin.json"
-        DEPENDS srtsepinferdemucs "${SRTSEPINFER_PLUGIN_MANIFEST}"
-        COMMENT "Stage project-built srtsepinfer interpreter"
+        DEPENDS srtsepinfer srtsepinferdemucs "${SRTSEPINFER_PLUGIN_MANIFEST}"
+        COMMENT "Stage project-built srtsepinfer library and interpreter"
         VERBATIM
     )
 
@@ -54,11 +56,13 @@ function(dssp_deploy_inference_plugins target)
 
     set(_beat_destination "${_plugin_root}/srtbeatinfer/inferenceinterpreters/beat-this")
     add_custom_target(srtbeatinfer_deploy_plugins
-        COMMAND "${CMAKE_COMMAND}" -E make_directory "${_beat_destination}"
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "${_dependency_dir}" "${_beat_destination}"
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+            "$<TARGET_FILE:srtbeatinfer>" "${_dependency_dir}/$<TARGET_FILE_NAME:srtbeatinfer>"
         COMMAND "${CMAKE_COMMAND}" -E copy_if_different "$<TARGET_FILE:srtbeatinferbeatthis>" "${_beat_destination}/$<TARGET_FILE_NAME:srtbeatinferbeatthis>"
         COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${SRTBEATINFER_PLUGIN_MANIFEST}" "${_beat_destination}/plugin.json"
-        DEPENDS srtbeatinferbeatthis "${SRTBEATINFER_PLUGIN_MANIFEST}"
-        COMMENT "Stage project-built srtbeatinfer interpreter"
+        DEPENDS srtbeatinfer srtbeatinferbeatthis "${SRTBEATINFER_PLUGIN_MANIFEST}"
+        COMMENT "Stage project-built srtbeatinfer library and interpreter"
         VERBATIM)
 
     add_dependencies(${target} srtbeatinfer_deploy_plugins)

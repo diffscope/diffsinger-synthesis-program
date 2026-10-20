@@ -16,10 +16,11 @@ target_include_directories(srtsepinfer PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>")
 
 generate_export_header(srtsepinfer EXPORT_FILE_NAME "include/srtsepinfer/export.h")
+# Deployment rewrites runtime paths. Retain the original binary for CMake installation.
 set_target_properties(srtsepinfer PROPERTIES
     OUTPUT_NAME synthrt-srtsepinfer
-    RUNTIME_OUTPUT_DIRECTORY "${DSSP_BUILD_RUNTIME_DIR}"
-    LIBRARY_OUTPUT_DIRECTORY "${DSSP_BUILD_LIBRARY_DIR}")
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/runtime/$<CONFIG>"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/runtime/$<CONFIG>")
 
 add_library(srtsepinfer_dsp STATIC src/SpectralTransform.cpp)
 target_compile_features(srtsepinfer_dsp PUBLIC cxx_std_23)

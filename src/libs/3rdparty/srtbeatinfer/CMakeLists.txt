@@ -12,10 +12,11 @@ target_link_libraries(srtbeatinfer PUBLIC synthrt::synthrt)
 target_include_directories(srtbeatinfer PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>" "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>")
 
 generate_export_header(srtbeatinfer EXPORT_FILE_NAME "include/srtbeatinfer/export.h")
+# Deployment rewrites runtime paths. Retain the original binary for CMake installation.
 set_target_properties(srtbeatinfer PROPERTIES
     OUTPUT_NAME synthrt-srtbeatinfer
-    RUNTIME_OUTPUT_DIRECTORY "${DSSP_BUILD_RUNTIME_DIR}"
-    LIBRARY_OUTPUT_DIRECTORY "${DSSP_BUILD_LIBRARY_DIR}"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/runtime/$<CONFIG>"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/runtime/$<CONFIG>"
 )
 
 add_library(srtbeatinfer_dsp STATIC src/BeatFeatures.cpp)

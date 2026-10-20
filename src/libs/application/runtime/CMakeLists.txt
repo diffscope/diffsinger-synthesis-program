@@ -1,3 +1,4 @@
+find_package(absl CONFIG REQUIRED)
 find_package(synthrt CONFIG REQUIRED)
 
 file(GLOB _src CONFIGURE_DEPENDS *.cpp *.h)
@@ -17,7 +18,7 @@ target_compile_definitions(dssp_runtime PRIVATE
 )
 
 target_link_libraries(dssp_runtime PUBLIC dssp_error dssp_resource stdcorelib::stdcorelib synthrt::synthrt)
-target_link_libraries(dssp_runtime PRIVATE $<$<PLATFORM_ID:Windows>:dxgi.lib>)
+target_link_libraries(dssp_runtime PRIVATE absl::strings $<$<PLATFORM_ID:Windows>:dxgi.lib>)
 
 if(DSSP_ENABLE_CUDA)
     target_compile_definitions(dssp_runtime PRIVATE DSSP_ENABLE_CUDA)

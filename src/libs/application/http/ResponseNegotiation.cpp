@@ -1,9 +1,11 @@
 #include "ResponseNegotiation.h"
 
-#include <charconv>
 #include <cstddef>
 #include <string>
+#include <system_error>
 #include <vector>
+
+#include <absl/strings/charconv.h>
 
 namespace dssp::http {
     namespace {
@@ -77,7 +79,7 @@ namespace dssp::http {
                 auto value = trim(parts[i].substr(equal + 1));
                 if (name == "q") {
                     weighted = true;
-                    const auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), quality);
+                    const auto [end, error] = absl::from_chars(value.data(), value.data() + value.size(), quality);
                     if (error != std::errc{} || end != value.data() + value.size() || !(quality >= 0 && quality <= 1)) {
                         valid = false;
                     }

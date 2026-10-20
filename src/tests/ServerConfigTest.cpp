@@ -1,6 +1,7 @@
 #include <chrono>
 #include <limits>
 #include <map>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -31,6 +32,30 @@ namespace dssp::tests {
         EXPECT_EQ(result->deviceIndex, 0);
         EXPECT_TRUE(result->packageDir.is_absolute());
         EXPECT_TRUE(result->runtimePath.is_absolute());
+    }
+
+    TEST(ServerConfig, SilenceThresholdAcceptsDecimalAndScientificNotation) {
+        const auto root = std::filesystem::current_path();
+        for (const auto &[text, expected] : {std::pair{"0", 0.0}, {"-0", -0.0}, {"0.125", 0.125}, {".5", 0.5}, {"1.", 1.0}, {"2e-3", 0.002}, {"1e+3", 1000.0}, {"1e-300", 1e-300}, {"4.9406564584124654e-324", std::numeric_limits<double>::denorm_min()}}) {
+            const auto commandLine = resolveCpuConfig({{"--package-dir", root.string()}, {"--silence-threshold", text}}, {}, root);
+            ASSERT_TRUE(commandLine) << text;
+            EXPECT_DOUBLE_EQ(commandLine->silenceThreshold, expected) << text;
+            const auto environment = resolveCpuConfig({{"--package-dir", root.string()}}, {{"DSSP_SILENCE_THRESHOLD", text}}, root);
+            ASSERT_TRUE(environment) << text;
+            EXPECT_DOUBLE_EQ(environment->silenceThreshold, expected) << text;
+        }
+    }
+
+    TEST(ServerConfig, SilenceThresholdRejectsInvalidNonfiniteAndOutOfRangeValues) {
+        const auto root = std::filesystem::current_path();
+        for (const auto text : {"", "-0.1", "nan", "inf", "-inf", "+0.5", " 0.5", "0.5 ", "0,5", "0x1p-1", "1e309", "1e-9999", "0.5junk", "1e"}) {
+            const auto commandLine = resolveCpuConfig({{"--package-dir", root.string()}, {"--silence-threshold", text}}, {}, root);
+            ASSERT_FALSE(commandLine) << text;
+            EXPECT_EQ(commandLine.error().option(), "--silence-threshold");
+            const auto environment = resolveCpuConfig({{"--package-dir", root.string()}}, {{"DSSP_SILENCE_THRESHOLD", text}}, root);
+            ASSERT_FALSE(environment) << text;
+            EXPECT_EQ(environment.error().option(), "--silence-threshold");
+        }
     }
 
     TEST(ServerConfig, InferenceCacheGroupsHaveIndependentDefaultsAndCliOverridesEnvironmentPerField) {

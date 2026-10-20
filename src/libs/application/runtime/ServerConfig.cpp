@@ -2,10 +2,13 @@
 
 #include <charconv>
 #include <cmath>
+#include <concepts>
 #include <exception>
 #include <optional>
+#include <system_error>
 #include <tuple>
 
+#include <absl/strings/charconv.h>
 #include <stdcorelib/path.h>
 #include <stdcorelib/support/systempaths.h>
 
@@ -13,9 +16,14 @@ namespace dssp::runtime {
 
     namespace {
 
-        template <class T>
+        template <std::integral T>
         bool number(const std::string &text, T &value) {
             const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
+            return error == std::errc{} && end == text.data() + text.size();
+        }
+
+        bool number(const std::string &text, double &value) {
+            const auto [end, error] = absl::from_chars(text.data(), text.data() + text.size(), value);
             return error == std::errc{} && end == text.data() + text.size();
         }
 

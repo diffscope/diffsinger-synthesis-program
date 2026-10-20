@@ -48,6 +48,7 @@
             "../vcpkg/ports"
         ],
         "overlay-triplets": [
+            "../vcpkg-triplets",
             "../vcpkg/triplets"
         ]
     }

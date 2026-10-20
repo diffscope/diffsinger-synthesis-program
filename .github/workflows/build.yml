@@ -65,12 +65,12 @@ jobs:
           - os: windows-2025
             platform: Windows
             arch: amd64
-#          - os: macos-15
-#            platform: macOS
-#            arch: arm64
-#          - os: ubuntu-24.04
-#            platform: Linux
-#            arch: amd64
+          - os: macos-15
+            platform: macOS
+            arch: arm64
+          - os: ubuntu-24.04
+            platform: Linux
+            arch: amd64
     runs-on: ${{ matrix.os }}
     env:
       VCPKG_REF: 39344dff01c5a5a0134caf2624cdd492f05d30ea

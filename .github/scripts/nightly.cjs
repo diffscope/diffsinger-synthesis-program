@@ -161,11 +161,10 @@ function expectedAssets(applicationName, semver) {
     return [
         ['_Windows_amd64_portable.zip', 'windows', 'amd64', 'zip', 'portable'],
         ['_Windows_amd64_debug_symbols.zip', 'windows', 'amd64', 'zip', 'debug_symbols'],
-        // Enable each platform's entries with its matrix entry in build.yml.
-        // ['_macOS_arm64_portable.zip', 'macos', 'arm64', 'zip', 'portable'],
-        // ['_macOS_arm64_debug_symbols.zip', 'macos', 'arm64', 'zip', 'debug_symbols'],
-        // ['_Linux_amd64_portable.zip', 'linux', 'amd64', 'zip', 'portable'],
-        // ['_Linux_amd64_debug_symbols.zip', 'linux', 'amd64', 'zip', 'debug_symbols'],
+        ['_macOS_arm64_portable.tar.xz', 'macos', 'arm64', 'tar.xz', 'portable'],
+        ['_macOS_arm64_debug_symbols.tar.xz', 'macos', 'arm64', 'tar.xz', 'debug_symbols'],
+        ['_Linux_amd64_portable.tar.xz', 'linux', 'amd64', 'tar.xz', 'portable'],
+        ['_Linux_amd64_debug_symbols.tar.xz', 'linux', 'amd64', 'tar.xz', 'debug_symbols'],
     ].map(([suffix, platform, arch, format, variant]) => ({ name: base + suffix, platform, arch, format, variant }));
 }
 

@@ -84,6 +84,7 @@ jobs:
       EXPECTED_SEMVER: ${{ needs.Prepare.outputs.semver }}
       ARTIFACT_PLATFORM: ${{ matrix.platform }}
       ARTIFACT_ARCH: ${{ matrix.arch }}
+      ARCHIVE_EXTENSION: ${{ matrix.platform == 'Windows' && 'zip' || 'tar.xz' }}
       USE_CCACHE: ${{ inputs.build_type != 'nightly' && inputs.use_cache && inputs.use_ccache }}
     steps:
       - name: Checkout repository
@@ -145,15 +146,15 @@ jobs:
           $output = & ./scripts/ci/Collect-Symbol-Files.ps1 `
             -VcpkgRootDir $env:VCPKG_ROOT_DIR `
             -InstallDir $env:INSTALL_DIR `
-            -ArchivePath "$($env:ARTIFACT_NAME)_debug_symbols.zip"
+            -ArchivePath "$($env:ARTIFACT_NAME)_debug_symbols.$($env:ARCHIVE_EXTENSION)"
           "SYMBOL_FILES_PATH=$output" >> $env:GITHUB_ENV
 
-      - name: Create portable ZIP
+      - name: Create portable archive
         run: |
           $archive = & ./scripts/ci/Create-Portable.ps1 `
             -InstallDir $env:INSTALL_DIR `
             -ApplicationName $env:APPLICATION_NAME `
-            -ArchivePath "$($env:ARTIFACT_NAME)_portable.zip"
+            -ArchivePath "$($env:ARTIFACT_NAME)_portable.$($env:ARCHIVE_EXTENSION)"
           "PORTABLE_PATH=$archive" >> $env:GITHUB_ENV
 
       - name: Upload symbol files
@@ -165,7 +166,7 @@ jobs:
           overwrite: true
           compression-level: 0
 
-      - name: Upload portable ZIP
+      - name: Upload portable archive
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.ARTIFACT_NAME }}_portable

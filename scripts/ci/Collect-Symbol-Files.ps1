@@ -129,13 +129,11 @@ try {
     try {
         if ($IsWindows) {
             & 7z a -tzip -mx=9 $archiveFullPath debug_symbols | Out-Host
-        } elseif ($IsMacOS) {
-            & /usr/bin/ditto -c -k --keepParent --norsrc debug_symbols $archiveFullPath | Out-Host
         } else {
-            & /usr/bin/zip -9 -r -y $archiveFullPath debug_symbols | Out-Host
+            & /usr/bin/tar -cJf $archiveFullPath debug_symbols | Out-Host
         }
         if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $archiveFullPath -PathType Leaf)) {
-            throw 'Symbol ZIP creation failed'
+            throw 'Symbol archive creation failed'
         }
     } finally {
         Pop-Location

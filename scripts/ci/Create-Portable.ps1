@@ -37,13 +37,11 @@ Push-Location $stagingRoot
 try {
     if ($IsWindows) {
         & 7z a -tzip -mx=9 $archiveFullPath $ApplicationName | Out-Host
-    } elseif ($IsMacOS) {
-        & /usr/bin/ditto -c -k --keepParent --norsrc $ApplicationName $archiveFullPath | Out-Host
     } else {
-        & /usr/bin/zip -9 -r -y $archiveFullPath $ApplicationName | Out-Host
+        & /usr/bin/tar -cJf $archiveFullPath $ApplicationName | Out-Host
     }
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $archiveFullPath -PathType Leaf)) {
-        throw 'Portable ZIP creation failed'
+        throw 'Portable archive creation failed'
     }
 } finally {
     Pop-Location

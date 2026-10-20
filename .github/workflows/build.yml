@@ -73,7 +73,7 @@ jobs:
             arch: amd64
     runs-on: ${{ matrix.os }}
     env:
-      VCPKG_REF: 39344dff01c5a5a0134caf2624cdd492f05d30ea
+      VCPKG_REF: 469a0504e4a6ebf6173d1c0f51a7fa34c382fd43
       VCPKG_DISABLE_METRICS: '1'
       MACOSX_DEPLOYMENT_TARGET: '13.3'
       BUILD_DIR: ${{ github.workspace }}/build/build

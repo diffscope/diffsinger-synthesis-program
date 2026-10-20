@@ -18,6 +18,14 @@ runs:
         if ($LASTEXITCODE -ne 0) { throw 'Build tool installation failed' }
         # vcpkg-make supplies an isolated MSYS2 environment for libmagic's Autotools build.
 
+    - name: Select Xcode (macOS)
+      if: runner.os == 'macOS'
+      shell: bash
+      run: |
+        sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
+        xcodebuild -version
+        xcrun clang++ --version
+
     - name: Install system dependencies (macOS)
       if: runner.os == 'macOS'
       shell: bash

@@ -1,0 +1,14 @@
+{
+    "repository": "diffscope/diffsinger-synthesis-program",
+    "attemptKind": "dssp-nightly-build",
+    "versionFile": "CMakeLists.txt",
+    "versionFormat": "cmake",
+    "artifacts": [
+        { "suffix": "_Windows_amd64_portable.zip", "platform": "windows", "arch": "amd64", "format": "zip", "variant": "portable" },
+        { "suffix": "_Windows_amd64_debug_symbols.zip", "platform": "windows", "arch": "amd64", "format": "zip", "variant": "debug_symbols" },
+        { "suffix": "_macOS_arm64_portable.tar.xz", "platform": "macos", "arch": "arm64", "format": "tar.xz", "variant": "portable" },
+        { "suffix": "_macOS_arm64_debug_symbols.tar.xz", "platform": "macos", "arch": "arm64", "format": "tar.xz", "variant": "debug_symbols" },
+        { "suffix": "_Linux_amd64_portable.tar.xz", "platform": "linux", "arch": "amd64", "format": "tar.xz", "variant": "portable" },
+        { "suffix": "_Linux_amd64_debug_symbols.tar.xz", "platform": "linux", "arch": "amd64", "format": "tar.xz", "variant": "debug_symbols" }
+    ]
+}

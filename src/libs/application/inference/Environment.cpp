@@ -25,6 +25,7 @@
 #include <wolf/Linguist/LinguistContrib.h>
 
 #include <dsspinference/NativeError.h>
+#include <dsspinference/PackageStoreLock.h>
 
 namespace dssp::inference {
     namespace {
@@ -212,7 +213,7 @@ namespace dssp::inference {
                     fs::directory_iterator iterator(directory, error), end;
                     while (!error && iterator != end) {
                         const auto status = iterator->symlink_status(error);
-                        if (!error && fs::is_directory(status)) {
+                        if (!error && fs::is_directory(status) && iterator->path().filename() != ".dspm") {
                             pending.push_back(iterator->path());
                         } else if (!error && fs::is_symlink(status) && log.isLevelEnabled(stdc::Logger::Trace)) {
                             log.stdcTrace("Skipping symbolic link during package discovery: %1", stdc::path::to_utf8(iterator->path()));
@@ -245,7 +246,9 @@ namespace dssp::inference {
 
     class Environment::Impl {
     public:
-        // Destruction is reversed: inference pools, handles, unit/driver, factory.
+        // Store locks outlive inference pools, package handles, and native providers.
+        std::vector<std::unique_ptr<PackageStoreLock>> storeLocks;
+        std::map<std::filesystem::path, InstalledPackage> installedPackages;
         ds::InferenceDriverFactory drivers;
         srt::SynthUnit unit;
         std::vector<srt::PackageHandle> packages;
@@ -266,6 +269,17 @@ namespace dssp::inference {
             log.stdcDebug("Initializing shared inference environment (%1 package roots, %2 plugin paths, ONNX configured=%3)", options.packageRoots.size(), options.pluginPaths.size(), options.onnx.has_value());
             wolf::linkLinguistCategory();
             auto impl = std::make_unique<Impl>();
+            for (const auto &root : options.packageStoreRoots) {
+                auto lock = PackageStoreLock::acquire(root);
+                if (!lock) {
+                    return std::unexpected{std::move(lock.error())};
+                }
+                for (const auto &package : (*lock)->packages()) {
+                    impl->installedPackages.insert_or_assign(package.path, package);
+                }
+                impl->storeLocks.push_back(std::move(*lock));
+                log.stdcDebug("Retaining shared package store lock: %1", stdc::path::to_utf8(root));
+            }
             impl->cacheOptions = options.cacheGroups;
             std::map<std::string, std::vector<std::filesystem::path>> pluginPaths;
             for (const auto &entry : options.pluginPaths) {
@@ -421,6 +435,15 @@ namespace dssp::inference {
             // Keep dependencies that were committed even if they were not direct roots.
             impl->packages = impl->unit.loadedPackages();
             std::ranges::sort(impl->packages, [](const auto &left, const auto &right) { return std::make_pair(left.id(), left.version()) < std::make_pair(right.id(), right.version()); });
+            for (const auto &package : impl->packages) {
+                const auto installed = impl->installedPackages.find(package.path());
+                if (!impl->storeLocks.empty() && installed == impl->installedPackages.end()) {
+                    return std::unexpected{InitializationError("Loaded package is not registered in the package store: " + stdc::path::to_utf8(package.path()))};
+                }
+                if (installed != impl->installedPackages.end() && (installed->second.id != package.id() || installed->second.version != package.version())) {
+                    return std::unexpected{InitializationError("Loaded package identity differs from its installed index: " + stdc::path::to_utf8(package.path()))};
+                }
+            }
 
             if (options.onnx && options.onnx->executionProvider == runtime::ExecutionProvider::DirectML) {
                 auto gate = resource::ExecutionGate::create("dssp-inference/directml");
@@ -488,6 +511,17 @@ namespace dssp::inference {
     }
 
     const std::vector<srt::PackageHandle> &Environment::packages() const noexcept { return m_impl->packages; }
+
+    const std::string *Environment::packageHash(const srt::PackageHandle &package) const {
+        if (!package) {
+            return nullptr;
+        }
+        const auto installed = m_impl->installedPackages.find(package.path());
+        if (installed == m_impl->installedPackages.end() || installed->second.id != package.id() || installed->second.version != package.version()) {
+            return nullptr;
+        }
+        return &installed->second.hash;
+    }
 
     const std::vector<PackageProblem> &Environment::problems() const noexcept { return m_impl->problems; }
 

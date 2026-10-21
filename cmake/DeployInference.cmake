@@ -1,8 +1,5 @@
 include_guard(GLOBAL)
 
-set(DSSP_WOLF_LANG_PACKAGES "" CACHE PATH
-    "Directory containing unpacked Wolf language packages (each with desc.json)")
-
 function(dssp_deploy_inference_plugins target)
     find_package(onnxruntime-builds CONFIG REQUIRED)
 
@@ -100,31 +97,6 @@ function(dssp_deploy_inference_plugins target)
         if(DSSP_INSTALL)
             install(DIRECTORY "${ONNXRUNTIME_BUILDS_CUDA_RUNTIME_DIR}/" DESTINATION "${_ort_install_destination}/cuda")
         endif()
-    endif()
-
-    # Package data is prepared separately from building Wolf. Copy only package
-    # directories, leaving archives and duplicate unpacked trees out of discovery.
-    set(_language_source "${DSSP_WOLF_LANG_PACKAGES}")
-    if(NOT _language_source AND DEFINED ENV{WOLF_LANG_PACKAGES_SOURCE})
-        set(_language_source "$ENV{WOLF_LANG_PACKAGES_SOURCE}")
-    endif()
-
-    if(_language_source)
-        if(NOT IS_DIRECTORY "${_language_source}")
-            message(FATAL_ERROR "Wolf language package directory does not exist: ${_language_source}")
-        endif()
-
-        file(GLOB _manifests CONFIGURE_DEPENDS "${_language_source}/*/desc.json")
-        foreach(_manifest IN LISTS _manifests)
-            get_filename_component(_package_dir "${_manifest}" DIRECTORY)
-            get_filename_component(_package_name "${_package_dir}" NAME)
-
-            qm_add_copy_command(${target}
-                SOURCES "${_package_dir}/"
-                DESTINATION "${DSSP_BUILD_DATA_DIR}/wolf/packages/${_package_name}"
-                SKIP_INSTALL
-            )
-        endforeach()
     endif()
 
     # Dynamically loaded plugins have dependencies that the executable's

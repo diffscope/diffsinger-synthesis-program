@@ -1,10 +1,12 @@
 #include <chrono>
+#include <filesystem>
 #include <future>
 #include <limits>
 #include <string>
 #include <vector>
 
 #include <gtest/gtest.h>
+#include <stdcorelib/scope_guard.h>
 
 #include <dssparchdiffsinger/DiffSinger.h>
 #include <dssparchdiffsinger/Factory.h>
@@ -12,6 +14,7 @@
 #include <dssparchdiffsinger/SynthesisInferences.h>
 #include <dssparchdiffsinger/SynthesisScore.h>
 #include <dssptests/TestLanguagePackage.h>
+#include <dssptests/TestPackageStore.h>
 
 namespace dssp::tests {
     using namespace std::chrono_literals;
@@ -75,9 +78,16 @@ namespace dssp::tests {
         void SetUp() override {
             LanguagePackageOptions package;
             package.singer = true;
-            writeLanguagePackage(m_files, "package", package);
+            writeLanguagePackage(m_files, m_packageDirectory, package);
+            const auto sql = "INSERT INTO packages VALUES ('example/language', '1.0.0.0', '" + m_packageDirectory + "', '" + std::string(128, 'a') + "')";
+            ASSERT_NO_FATAL_FAILURE(writePackageStore(m_files.path(), sql.c_str()));
+            ASSERT_NO_FATAL_FAILURE(initialize(m_files.path()));
+        }
+
+        void initialize(const std::filesystem::path &root) {
             inference::EnvironmentOptions options;
-            options.packageRoots = {m_files.path()};
+            options.packageRoots = {root};
+            options.packageStoreRoots = {root};
             const std::filesystem::path plugins(DSSP_TEST_PLUGIN_DIR);
             options.pluginPaths = arch_diffsinger::pluginPaths(plugins);
             options.pluginPaths.push_back({"inference", plugins / "dsinfer" / "inferenceinterpreters"});
@@ -123,6 +133,7 @@ namespace dssp::tests {
             return input;
         }
 
+        const std::string m_packageDirectory = "fb79980ed728fbaacc3c73ab5b8b3dd9a994d905d7cc411a1f863f3d5849e3da";
         TestFiles m_files;
         std::shared_ptr<inference::Environment> m_environment;
         arch::ArchitecturePtr m_implementation;
@@ -321,9 +332,8 @@ namespace dssp::tests {
         auto unknown = m_context;
         unknown.singers[0].id = "missing";
         EXPECT_FALSE(m_implementation->envTag(unknown));
-        // Current contract deliberately trusts package ID/version until the
-        // package manager supplies hashes; no model file content is scanned.
-        m_files.write("package/missing-acoustic.onnx", "changed bytes, same package version");
+        // Environment tags use the installed index snapshot without reading models.
+        m_files.write(std::filesystem::path(m_packageDirectory) / "missing-acoustic.onnx", "changed bytes, same package version");
         const auto unchanged = m_implementation->envTag(m_context);
         ASSERT_TRUE(unchanged);
         EXPECT_EQ(*tag, *unchanged);
@@ -332,5 +342,69 @@ namespace dssp::tests {
             ASSERT_TRUE(pool);
             EXPECT_EQ((*pool)->residentCount(), 0U);
         }
+    }
+
+    TEST_F(SynthesisTest, EnvironmentTagsChangeWithInstalledContentHashesAfterRestart) {
+        const auto original = m_implementation->envTag(m_context);
+        ASSERT_TRUE(original);
+        m_implementation.reset();
+        m_environment.reset();
+        const auto sql = "UPDATE packages SET hash = '" + std::string(128, 'b') + "'";
+        ASSERT_NO_FATAL_FAILURE(writePackageStore(m_files.path(), sql.c_str()));
+        ASSERT_NO_FATAL_FAILURE(initialize(m_files.path()));
+        const auto replaced = m_implementation->envTag(m_context);
+        ASSERT_TRUE(replaced);
+        EXPECT_NE(*original, *replaced);
+    }
+
+    TEST_F(SynthesisTest, EnvironmentTagsAreStableWhenTheIndexedStoreIsRelocated) {
+        const auto original = m_implementation->envTag(m_context);
+        ASSERT_TRUE(original);
+        TestFiles relocated;
+        const auto release = stdc::make_scope_guard([this] {
+            m_implementation.reset();
+            m_environment.reset();
+        });
+        LanguagePackageOptions package;
+        package.singer = true;
+        writeLanguagePackage(relocated, m_packageDirectory, package);
+        const auto sql = "INSERT INTO packages VALUES ('example/language', '1.0.0.0', '" + m_packageDirectory + "', '" + std::string(128, 'a') + "')";
+        ASSERT_NO_FATAL_FAILURE(writePackageStore(relocated.path(), sql.c_str()));
+        m_implementation.reset();
+        m_environment.reset();
+        ASSERT_NO_FATAL_FAILURE(initialize(relocated.path()));
+        const auto moved = m_implementation->envTag(m_context);
+        ASSERT_TRUE(moved);
+        EXPECT_EQ(*original, *moved);
+    }
+
+    TEST_F(SynthesisTest, EnvironmentTagsIncludeImportedPackageContentHashes) {
+        m_implementation.reset();
+        m_environment.reset();
+        const std::string vocoderDirectory = "c362cda0680c2d07836a03eb6f247e8e9b1304664fd6344383a3094199b700c9";
+        m_files.write(std::filesystem::path(m_packageDirectory) / "desc.json", R"({"$version":"1.0","id":"example/language","version":"1","runtimeLevel":1,
+            "dependencies":[{"id":"example/vocoder","version":"1"}],
+            "contributions":{"inference":[{"id":"acoustic","path":"acoustic.json"}],"singer":[{"id":"main","path":"singer.json"}]}})");
+        m_files.write(std::filesystem::path(m_packageDirectory) / "singer.json", R"({"interface":"org.openvpi.dsinfer.singer.DiffSinger","variant":"openvpi","level":1,
+            "name":"Test singer","configuration":{"dict":"unused-dictionary.txt"},"imports":[
+            {"role":"singer/acoustic","ref":":inference/acoustic","options":{}},
+            {"role":"singer/vocoder","ref":"example/vocoder:inference/main","options":{}}]})");
+        m_files.write(std::filesystem::path(vocoderDirectory) / "desc.json", R"({"$version":"1.0","id":"example/vocoder","version":"1","runtimeLevel":1,
+            "contributions":{"inference":[{"id":"main","path":"vocoder.json"}]}})");
+        m_files.write(std::filesystem::path(vocoderDirectory) / "vocoder.json", R"({"interface":"org.openvpi.dsinfer.inference.Vocoder","variant":"onnx","level":1,
+            "exports":{},"configuration":{"model":"${root}/missing-vocoder.onnx","pitchControllable":true}})");
+        const auto insert = "INSERT INTO packages VALUES ('example/vocoder', '1.0.0.0', '" + vocoderDirectory + "', '" + std::string(128, 'b') + "')";
+        ASSERT_NO_FATAL_FAILURE(writePackageStore(m_files.path(), insert.c_str()));
+        ASSERT_NO_FATAL_FAILURE(initialize(m_files.path()));
+        const auto original = m_implementation->envTag(m_context);
+        ASSERT_TRUE(original);
+        m_implementation.reset();
+        m_environment.reset();
+        const auto update = "UPDATE packages SET hash = '" + std::string(128, 'c') + "' WHERE id = 'example/vocoder'";
+        ASSERT_NO_FATAL_FAILURE(writePackageStore(m_files.path(), update.c_str()));
+        ASSERT_NO_FATAL_FAILURE(initialize(m_files.path()));
+        const auto changed = m_implementation->envTag(m_context);
+        ASSERT_TRUE(changed);
+        EXPECT_NE(*original, *changed);
     }
 }

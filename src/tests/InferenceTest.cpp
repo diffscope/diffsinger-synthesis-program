@@ -50,6 +50,20 @@ namespace dssp::tests {
         EXPECT_NE(host.error().message().find("second"), std::string::npos);
     }
 
+    TEST(Inference, PackageManagerStateIsExcludedFromDiscovery) {
+        TestFiles files;
+        const auto declaration = R"({"$version":"1.0","id":"example/library","version":"1","runtimeLevel":1,"contributions":{}})";
+        files.write("installed/desc.json", declaration);
+        files.write(".dspm/transactions/backup/desc.json", declaration);
+        files.write(".dspm/transactions/staging/desc.json", "invalid JSON");
+        inference::EnvironmentOptions options;
+        options.packageRoots = {files.path()};
+        const auto host = inference::Environment::create(options);
+        ASSERT_TRUE(host);
+        ASSERT_EQ((*host)->packages().size(), 1U);
+        EXPECT_TRUE((*host)->problems().empty());
+    }
+
     TEST(Inference, ARequestedRuntimeCannotSilentlyFallBack) {
         inference::EnvironmentOptions options;
         options.onnx = inference::OnnxOptions{{}, {}, runtime::ExecutionProvider::CUDA, 7};

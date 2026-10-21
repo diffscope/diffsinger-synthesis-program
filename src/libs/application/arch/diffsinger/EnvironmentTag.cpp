@@ -3,6 +3,7 @@
 #include <exception>
 #include <map>
 #include <set>
+#include <utility>
 
 #include <synthrt/Core/ContribImportBinding.h>
 
@@ -11,21 +12,26 @@
 
 namespace dssp::arch_diffsinger {
     namespace {
-        void collectPackages(const srt::ContribSpec &spec, std::set<std::string> &visited, std::map<std::string, srt::JsonValue> &packages) {
+        std::expected<void, arch::OperationError> collectPackages(const inference::Environment &environment, const srt::ContribSpec &spec, std::set<std::string> &visited, std::map<std::string, srt::JsonValue> &packages) {
             if (!visited.insert(inference::resourceId(spec)).second) {
-                return;
+                return {};
             }
 
             const auto package = spec.package();
             const auto key = package.id() + '=' + package.version().toString();
-            // TODO: replace package identity/version with the content hash supplied
-            // by the package manager. Do not scan model files at service startup.
-            packages.emplace(key, srt::JsonObject{{"id", package.id()}, {"version", package.version().toString()}});
+            const auto *hash = environment.packageHash(package);
+            if (!hash) {
+                return std::unexpected{arch::OperationError("Installed content hash is unavailable for package " + key)};
+            }
+            packages.emplace(key, *hash);
             for (const auto &imported : spec.imports()) {
                 if (imported.binding() && imported.binding()->state() == srt::ContribImportBinding::Active) {
-                    collectPackages(imported.binding()->target(), visited, packages);
+                    if (auto collected = collectPackages(environment, imported.binding()->target(), visited, packages); !collected) {
+                        return collected;
+                    }
                 }
             }
+            return {};
         }
     }
 
@@ -43,7 +49,9 @@ namespace dssp::arch_diffsinger {
             std::set<std::string> visited;
             std::map<std::string, srt::JsonValue> packages;
             for (const auto &source : context->sources) {
-                collectPackages(*source.singer->spec, visited, packages);
+                if (auto collected = collectPackages(*catalog.environment(), *source.singer->spec, visited, packages); !collected) {
+                    return fail<arch::EnvironmentErrors>(std::move(collected.error()));
+                }
                 srt::JsonObject mappings;
                 for (const auto &[stage, record] : source.singer->stages) {
                     srt::JsonObject mapping;
@@ -55,9 +63,9 @@ namespace dssp::arch_diffsinger {
                 sources.push_back(srt::JsonObject{{"singer", source.singer->info.id}, {"speaker", source.speaker}, {"group", source.singer->info.group}, {"speakerMappings", std::move(mappings)}});
             }
 
-            srt::JsonObject packageIdentities;
+            srt::JsonObject packageHashes;
             for (auto &[id, value] : packages) {
-                packageIdentities.emplace(id, std::move(value));
+                packageHashes.emplace(id, std::move(value));
             }
 
             const srt::JsonValue effective(srt::JsonObject{
@@ -65,7 +73,7 @@ namespace dssp::arch_diffsinger {
                 {"programVersion", DSSP_PROGRAM_VERSION}, {"synthrtRevision", DSSP_SYNTHRT_REVISION}, {"wolfRevision", DSSP_WOLF_REVISION},
                 {"steps", srt::JsonObject{{"pitch", context->options.steps.pitch}, {"variance", context->options.steps.variance}, {"acoustic", context->options.steps.acoustic}}},
                 {"depth", static_cast<double>(context->options.depth)},
-                {"sources", std::move(sources)}, {"packages", std::move(packageIdentities)}
+                {"sources", std::move(sources)}, {"packages", std::move(packageHashes)}
             });
             const auto digest = inference::fingerprint(effective.toJson());
             if (!digest) {

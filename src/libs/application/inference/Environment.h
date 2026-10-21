@@ -33,6 +33,8 @@ namespace dssp::inference {
 
     struct EnvironmentOptions {
         std::vector<std::filesystem::path> packageRoots;
+        // The subset of packageRoots protected by dspm shared store locks.
+        std::vector<std::filesystem::path> packageStoreRoots;
         std::vector<PluginSearchPath> pluginPaths;
         // Empty for a metadata-only host or a host registering another runtime service.
         std::optional<OnnxOptions> onnx;
@@ -57,6 +59,8 @@ namespace dssp::inference {
         std::expected<InferencePool *, InitializationError> inferences(std::string_view group);
         void shutdown();
         const std::vector<srt::PackageHandle> &packages() const noexcept;
+        // Returns the indexed content hash, or nullptr for an unregistered package.
+        const std::string *packageHash(const srt::PackageHandle &) const;
         const std::vector<PackageProblem> &problems() const noexcept;
 
     private:

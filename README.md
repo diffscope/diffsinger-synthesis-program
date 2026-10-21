@@ -22,7 +22,7 @@ cmake --install build --config Release --prefix installed
 
 ## Usage
 
-Prepare compatible model packages, then run the following commands from the installation's `bin` directory:
+Install compatible model and language packages with dspm into the package directory, then run the following commands from the installation's `bin` directory:
 
 ```sh
 dssp dump-devices
@@ -30,6 +30,12 @@ dssp serve --package-dir /path/to/packages --execution-provider cpu
 ```
 
 The server listens on `127.0.0.1:13711` by default. Use `--host` and `--port` to change the listening address, or run `dssp serve --help` for more options. Model packages must be obtained separately.
+
+DSSP holds a shared dspm store lock on `<package-dir>/.dspm/lock` from package discovery until all dependent resources are released. Multiple DSSP instances and dspm queries can access the same store concurrently. Installation, replacement, removal, and transaction recovery require exclusive access and remain unavailable while a DSSP instance retains the lock. The package directory must permit creation of `.dspm` and its permanent lock file if they do not exist.
+
+Startup fails if the package store is locked exclusively, has pending transactions or commit markers, or contains an unsupported package database schema. Recovery remains owned by dspm. Run `dspm --packages-dir /path/to/packages list` after stopping programs that retain the store lock, resolve any pending cleanup diagnostics, and then restart DSSP. Package discovery excludes `.dspm` directories.
+
+All loaded packages must be registered in the package store with valid content hashes and matching identities and directories. Synthesis environment tags include the SHA-512 content hashes recorded by dspm for all referenced packages, including imported dependencies. DSSP reads these hashes under the shared store lock and retains the index snapshot without scanning model contents. Replacing an indexed package with different contents changes its environment tag after DSSP restarts.
 
 Logs are written to stderr. `--log-mode normal` (the default) uses the console format with colors where supported. Use `--log-mode structured` for one compact JSON object per line without colors:
 

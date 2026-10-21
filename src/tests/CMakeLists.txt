@@ -2,6 +2,7 @@ find_package(GTest CONFIG REQUIRED)
 find_package(stdcorelib CONFIG REQUIRED)
 find_package(onnxruntime-builds CONFIG REQUIRED)
 find_package(ICU 68 REQUIRED COMPONENTS uc i18n data)
+find_package(unofficial-sqlite3 CONFIG REQUIRED)
 
 # Default time-zone changes are isolated from the application/backend tests.
 add_executable(dssp_log_timestamp_tests LogTimestampTest.cpp ../app/LogTimestamp.cpp)
@@ -30,6 +31,7 @@ add_executable(dssp_tests
     LogCapture.h
     TestFiles.h
     TestLanguagePackage.h
+    TestPackageStore.h
     TestAnalysisPackage.h
     TestCoroutine.h
 )
@@ -53,7 +55,7 @@ target_link_libraries(dssp_http_streaming_tests PRIVATE dssp_api_v1 GTest::gtest
 # Backend and composition tests are isolated from the HTTP/API target.
 add_executable(dssp_arch_diffsinger_tests DiffSingerTest.cpp SingerDiscoveryTest.cpp LanguagePredictionTest.cpp SynthesisConversionTest.cpp SynthesisTest.cpp SynthesisPipelineTest.cpp ../app/ArchComposition.cpp)
 target_compile_features(dssp_arch_diffsinger_tests PRIVATE cxx_std_23)
-target_link_libraries(dssp_arch_diffsinger_tests PRIVATE dssp_arch_diffsinger GTest::gtest_main)
+target_link_libraries(dssp_arch_diffsinger_tests PRIVATE dssp_arch_diffsinger GTest::gtest_main unofficial::sqlite3::sqlite3)
 target_compile_definitions(dssp_arch_diffsinger_tests PRIVATE DSSP_TEST_RESOURCE_DIR="${DSSP_RESOURCE_BUILD_DIR}")
 
 get_filename_component(_test_vcpkg_prefix "${ONNXRUNTIME_BUILDS_INCLUDE_DIR}" DIRECTORY)
@@ -61,9 +63,9 @@ target_compile_definitions(dssp_http_access_log_tests PRIVATE DSSP_TEST_PLUGIN_D
 target_compile_definitions(dssp_arch_diffsinger_tests PRIVATE DSSP_TEST_PLUGIN_DIR="${_test_vcpkg_prefix}/$<$<CONFIG:Debug>:debug/>lib/plugins")
 
 # This host test deliberately has no architecture target in its link graph.
-add_executable(dssp_inference_tests InferenceTest.cpp InferencePoolTest.cpp ParallelismPolicyTest.cpp)
+add_executable(dssp_inference_tests InferenceTest.cpp InferencePoolTest.cpp ParallelismPolicyTest.cpp PackageStoreLockTest.cpp)
 target_compile_features(dssp_inference_tests PRIVATE cxx_std_23)
-target_link_libraries(dssp_inference_tests PRIVATE dssp_inference GTest::gtest_main)
+target_link_libraries(dssp_inference_tests PRIVATE dssp_inference GTest::gtest_main unofficial::sqlite3::sqlite3)
 target_compile_definitions(dssp_inference_tests PRIVATE DSSP_TEST_PLUGIN_DIR="${_test_vcpkg_prefix}/$<$<CONFIG:Debug>:debug/>lib/plugins")
 
 add_executable(dssp_resource_tests ResourceTest.cpp TaskExecutorTest.cpp WorkerPoolTest.cpp ExecutionGateTest.cpp CoroutineTest.cpp)

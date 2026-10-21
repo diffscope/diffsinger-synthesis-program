@@ -11,6 +11,7 @@
         "libmagic",
         "uriparser",
         "openssl",
+        "sqlite3",
         "drlibs",
         "pffft",
         {

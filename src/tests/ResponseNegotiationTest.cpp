@@ -25,7 +25,7 @@ namespace dssp::tests {
     }
 
     TEST(ResponseNegotiation, InvalidAndOutOfRangeQualitiesAreUnacceptable) {
-        for (const auto accept : {"application/json;q=", "application/json;q=+0.5", "application/json;q=0.5junk", "application/json;q=0x1p-1", "application/json;q=inf", "application/json;q=-0.5", "application/json;q=1e309", "application/json;q=1e-9999"}) {
+        for (const auto accept : {"application/json;q=", "application/json;q=+0.5", "application/json;q=0.5junk", "application/json;q=0x1p-1", "application/json;q=0X1P-1", "application/json;q=-0x0p0", "application/json;q=inf", "application/json;q=-0.5", "application/json;q=1e309", "application/json;q=1e-9999"}) {
             EXPECT_EQ(http::negotiateTaskResponse(accept), http::TaskRepresentation::Unacceptable) << accept;
         }
     }

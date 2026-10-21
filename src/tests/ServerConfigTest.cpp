@@ -48,7 +48,7 @@ namespace dssp::tests {
 
     TEST(ServerConfig, SilenceThresholdRejectsInvalidNonfiniteAndOutOfRangeValues) {
         const auto root = std::filesystem::current_path();
-        for (const auto text : {"", "-0.1", "nan", "inf", "-inf", "+0.5", " 0.5", "0.5 ", "0,5", "0x1p-1", "1e309", "1e-9999", "0.5junk", "1e"}) {
+        for (const auto text : {"", "-0.1", "nan", "inf", "-inf", "+0.5", " 0.5", "0.5 ", "0,5", "0x1p-1", "0X1P-1", "-0x0p0", "1e309", "1e-9999", "0.5junk", "1e"}) {
             const auto commandLine = resolveCpuConfig({{"--package-dir", root.string()}, {"--silence-threshold", text}}, {}, root);
             ASSERT_FALSE(commandLine) << text;
             EXPECT_EQ(commandLine.error().option(), "--silence-threshold");

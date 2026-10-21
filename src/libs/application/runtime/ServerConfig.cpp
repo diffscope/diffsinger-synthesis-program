@@ -23,6 +23,9 @@ namespace dssp::runtime {
         }
 
         bool number(const std::string &text, double &value) {
+            if (text.find_first_of("xX") != text.npos) {
+                return false;
+            }
             const auto [end, error] = absl::from_chars(text.data(), text.data() + text.size(), value);
             return error == std::errc{} && end == text.data() + text.size();
         }

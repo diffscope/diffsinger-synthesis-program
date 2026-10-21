@@ -80,7 +80,7 @@ namespace dssp::http {
                 if (name == "q") {
                     weighted = true;
                     const auto [end, error] = absl::from_chars(value.data(), value.data() + value.size(), quality);
-                    if (error != std::errc{} || end != value.data() + value.size() || !(quality >= 0 && quality <= 1)) {
+                    if (value.find_first_of("xX") != value.npos || error != std::errc{} || end != value.data() + value.size() || !(quality >= 0 && quality <= 1)) {
                         valid = false;
                     }
                 } else {

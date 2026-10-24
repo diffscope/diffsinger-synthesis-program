@@ -22,8 +22,8 @@ namespace dssp::inference {
         });
 
         bool inspect(const srt::ContribSpec &spec, std::set<const srt::ContribSpec *> &visiting) {
-            const bool composite = spec.interface() == "org.openvpi.wolf.inference.G2P" && spec.level() == 1 && spec.variant() == "pipe-chain";
-            if (!composite && !isParallelLeaf(spec.interface(), spec.level(), spec.variant())) return false;
+            const bool composite = spec.interfaceId() == "org.openvpi.wolf.inference.G2P" && spec.level() == 1 && spec.variant() == "pipe-chain";
+            if (!composite && !isParallelLeaf(spec.interfaceId(), spec.level(), spec.variant())) return false;
             if (!visiting.insert(&spec).second) return false;
             for (const auto &imported : spec.imports()) {
                 const auto *binding = imported.binding();

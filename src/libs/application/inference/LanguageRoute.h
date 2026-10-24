@@ -4,19 +4,9 @@
 #include <optional>
 #include <string_view>
 
-// Preserve the caller's Windows SDK macro while parsing synthrt's interface().
-#ifdef _WIN32
-#    pragma push_macro("interface")
-#    undef interface
-#endif
-
 #include <synthrt/SVS/SingerContrib.h>
 #include <wolf/Api/Inferences/Common/1/CommonApiL1.h>
 #include <wolf/Linguist/LinguistContrib.h>
-
-#ifdef _WIN32
-#    pragma pop_macro("interface")
-#endif
 
 #include <dsspinference/InferenceError.h>
 

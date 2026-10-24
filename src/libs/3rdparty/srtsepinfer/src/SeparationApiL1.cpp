@@ -28,7 +28,7 @@ namespace srtsepinfer::Api::Separation::L1 {
     }
 
     srt::Expected<std::unique_ptr<SeparationExecutive>> createSeparator(srt::InferenceSpec &spec) {
-        if (spec.interface() != API_INTERFACE || spec.level() != API_LEVEL)
+        if (spec.interfaceId() != API_INTERFACE || spec.level() != API_LEVEL)
             return srt::Error(SeparationError::ContractViolation, "Expected a Separation Level 1 inference");
 
         auto made = spec.createInference(SeparationImportOptions(spec.variant()), SeparationRuntimeOptions(spec.variant()));

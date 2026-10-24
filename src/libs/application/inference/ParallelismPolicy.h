@@ -3,14 +3,7 @@
 
 #include <string_view>
 
-#ifdef _WIN32
-#    pragma push_macro("interface")
-#    undef interface
-#endif
 #include <synthrt/Core/ContribSpec.h>
-#ifdef _WIN32
-#    pragma pop_macro("interface")
-#endif
 
 namespace dssp::inference {
     // This is a host whitelist, not an inference/provider concurrency contract.

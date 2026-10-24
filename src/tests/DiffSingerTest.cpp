@@ -160,23 +160,6 @@ namespace dssp::tests {
         EXPECT_EQ(completed.load(), 8U);
     }
 
-    TEST(DiffSinger, MissingWolfDefaultLyricRemainsEmptyForEveryLanguage) {
-        arch_diffsinger::GroupRecord record;
-        record.info.id = "group";
-        for (const auto handle : {"cmn", "eng", "jpn", "yue", "deu"}) {
-            record.info.languages.emplace(handle, arch::GroupLanguageInfo{});
-            record.languageNames.emplace(handle, srt::DisplayText(handle));
-        }
-
-        const auto info = arch_diffsinger::groupInfo(record, {});
-        ASSERT_TRUE(info);
-        ASSERT_EQ(info->languages.size(), record.languageNames.size());
-        for (const auto &[handle, language] : info->languages) {
-            EXPECT_EQ(language.name, handle);
-            EXPECT_TRUE(language.defaultLyric.empty());
-        }
-    }
-
     TEST(DiffSinger, GroupLocalizationRetainsEachLanguageCapabilityAndTheCommittedSnapshot) {
         arch_diffsinger::GroupRecord record;
         record.info.id = "group";

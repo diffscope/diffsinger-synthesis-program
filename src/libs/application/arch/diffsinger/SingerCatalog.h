@@ -7,18 +7,8 @@
 #include <string>
 #include <vector>
 
-// Preserve the caller's Windows SDK macro while parsing synthrt's interface().
-#ifdef _WIN32
-#    pragma push_macro("interface")
-#    undef interface
-#endif
-
 #include <synthrt/Core/ContribSpec.h>
 #include <synthrt/SVS/SingerContrib.h>
-
-#ifdef _WIN32
-#    pragma pop_macro("interface")
-#endif
 
 #include <dssparch/Errors.h>
 #include <dssparch/Types.h>

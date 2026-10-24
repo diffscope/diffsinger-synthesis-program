@@ -21,14 +21,7 @@
 
 #include <gtest/gtest.h>
 
-#ifdef _WIN32
-#    pragma push_macro("interface")
-#    undef interface
-#endif
 #include <dsspinference/Environment.h>
-#ifdef _WIN32
-#    pragma pop_macro("interface")
-#endif
 #include <dsspinference/PackageStoreLock.h>
 #include <dssptests/TestFiles.h>
 #include <dssptests/TestPackageStore.h>

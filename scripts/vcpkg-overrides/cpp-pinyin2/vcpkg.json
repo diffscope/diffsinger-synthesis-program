@@ -1,0 +1,19 @@
+{
+  "name": "cpp-pinyin2",
+  "version": "2.0.0",
+  "port-version": 1,
+  "description": "Mandarin Pinyin and Cantonese Jyutping conversion",
+  "homepage": "https://github.com/wolfgitpr/cpp-pinyin",
+  "license": "Apache-2.0 AND CC-BY-SA-4.0",
+  "supports": "!uwp",
+  "dependencies": [
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    },
+    {
+      "name": "vcpkg-cmake-config",
+      "host": true
+    }
+  ]
+}

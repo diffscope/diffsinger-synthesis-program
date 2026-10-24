@@ -21,7 +21,7 @@ namespace dssp::tests {
     namespace {
         constexpr char gif[] = "GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02\x44\x01\x00\x3b";
 
-        void writeSingerPackage(const TestFiles &files, std::string_view directory, std::string_view version, bool predictiveStages = false) {
+        void writeSingerPackage(const TestFiles &files, std::string_view directory, std::string_view version, bool predictiveStages = false, std::string_view defaultLyric = {}) {
             const std::filesystem::path root(directory);
             const std::string stageDeclarations = predictiveStages ? R"(,{"id":"duration","path":"duration.json"},{"id":"pitch","path":"pitch.json"},{"id":"variance","path":"variance.json"})" : "";
             files.write(root / "desc.json", "{\"$version\":\"1.0\",\"id\":\"example/singers\",\"version\":\"" + std::string(version) + R"(","runtimeLevel":1,"contributions":{
@@ -45,9 +45,10 @@ namespace dssp::tests {
             files.write(root / "g2p.json", R"({"interface":"org.openvpi.wolf.inference.G2P","variant":"pipe-chain","level":1,
                 "exports":{"languages":[{"language":"eng","scheme":"test"}],"symbols":["a"]},
                 "configuration":{"formatVersion":1,"steps":[{"step":"fallback","params":{}}]}})");
+            const std::string lyricDeclaration = defaultLyric.empty() ? "" : ",\"defaultLyric\":\"" + std::string(defaultLyric) + '"';
             files.write(root / "eng.json", R"({"interface":"org.openvpi.wolf.linguist.WolfLinguist","variant":"wolf","level":1,
                 "language":"eng","scheme":"test","name":{"_":"English","ja":"英語"},
-                "exports":{"phonemes":["a"]},"configuration":{},"imports":[{"role":"linguist/g2p","ref":":inference/g2p"}]})");
+                "exports":{"phonemes":["a"]},"configuration":{},"imports":[{"role":"linguist/g2p","ref":":inference/g2p"}])" + lyricDeclaration + '}');
             for (const auto id : {"first", "second"}) {
                 const std::string languageRole = std::string_view(id) == "first" ? "language/eng" : "custom/english";
                 const std::string stageImports = predictiveStages ? R"(
@@ -68,7 +69,7 @@ namespace dssp::tests {
     class SingerDiscoveryTest : public ::testing::Test {
     protected:
         void SetUp() override {
-            writeSingerPackage(m_files, "one", "1");
+            writeSingerPackage(m_files, "one", "1", false, "la");
             writeSingerPackage(m_files, "two", "2");
             inference::EnvironmentOptions options;
             options.packageRoots = {m_files.path()};
@@ -118,12 +119,12 @@ namespace dssp::tests {
             ASSERT_TRUE(*group);
             ASSERT_EQ((**group).languages.size(), 1U);
             EXPECT_EQ((**group).languages.at("eng").name, "English");
-            EXPECT_TRUE((**group).languages.at("eng").defaultLyric.empty());
             EXPECT_EQ((**group).durationMode, arch::DurationMode::Skip);
             const auto *record = diffsinger->catalog().find(singer.id);
             ASSERT_NE(record, nullptr);
             EXPECT_TRUE(record->reservedPhonemes.empty());
             EXPECT_EQ(record->package.id(), "example/singers");
+            EXPECT_EQ((**group).languages.at("eng").defaultLyric, record->package.version().toString() == "1.0" ? "la" : "");
             EXPECT_EQ(record->spec->locator().category(), "singer");
             EXPECT_FALSE(record->package.version().isEmpty());
             ASSERT_TRUE(record->languages.contains("eng"));

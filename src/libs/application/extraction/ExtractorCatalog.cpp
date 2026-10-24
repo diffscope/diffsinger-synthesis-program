@@ -21,7 +21,7 @@ namespace dssp::extraction {
         template <class Schema, class Create>
         std::expected<ExtractorRecord, inference::ResourceError> read(srt::InferenceSpec &spec, Kind kind, inference::InferencePool &pool, Create create) {
             const auto *schema = dynamic_cast<const Schema *>(spec.exports());
-            if (!schema || !spec.configuration() || schema->interface() != spec.interface() || schema->level() != spec.level() || schema->variant() != spec.variant() || schema->sampleRate <= 0 || schema->channelCount != 1 || !std::isfinite(schema->maxSegmentDuration) || schema->maxSegmentDuration < 0) {
+            if (!schema || !spec.configuration() || schema->interfaceId() != spec.interfaceId() || schema->level() != spec.level() || schema->variant() != spec.variant() || schema->sampleRate <= 0 || schema->channelCount != 1 || !std::isfinite(schema->maxSegmentDuration) || schema->maxSegmentDuration < 0) {
                 return std::unexpected{inference::ResourceError("Analyzer has an unsupported typed contract, format or duration limit")};
             }
 
@@ -60,7 +60,7 @@ namespace dssp::extraction {
 
         std::expected<ExtractorRecord, inference::ResourceError> readSeparation(srt::InferenceSpec &spec, inference::InferencePool &pool) {
             const auto *schema = dynamic_cast<const Sep::SeparationSchema *>(spec.exports());
-            if (!schema || !spec.configuration() || schema->interface() != spec.interface() || schema->level() != spec.level() || schema->variant() != spec.variant() || schema->sampleRate <= 0 || schema->channelCount <= 0 || schema->tracks.empty() || !std::isfinite(schema->maxSegmentDuration) || schema->maxSegmentDuration != 0) return std::unexpected{inference::ResourceError("Separator has an unsupported typed audio or duration contract")};
+            if (!schema || !spec.configuration() || schema->interfaceId() != spec.interfaceId() || schema->level() != spec.level() || schema->variant() != spec.variant() || schema->sampleRate <= 0 || schema->channelCount <= 0 || schema->tracks.empty() || !std::isfinite(schema->maxSegmentDuration) || schema->maxSegmentDuration != 0) return std::unexpected{inference::ResourceError("Separator has an unsupported typed audio or duration contract")};
             ExtractorRecord record;
             record.kind = Kind::Separation;
             record.id = inference::resourceReference(spec);
@@ -120,13 +120,13 @@ namespace dssp::extraction {
             for (auto *spec : category->inferences()) {
                 if (spec->variant() == "stub" || spec->level() != 1) continue;
                 std::expected<ExtractorRecord, inference::ResourceError> record = std::unexpected{inference::ResourceError("Unsupported analysis contract")};
-                if (spec->interface() == Note::API_INTERFACE) {
+                if (spec->interfaceId() == Note::API_INTERFACE) {
                     record = read<Note::NoteSchema>(*spec, Kind::Note, **notePool, Note::createAnalyzer);
-                } else if (spec->interface() == F0::API_INTERFACE) {
+                } else if (spec->interfaceId() == F0::API_INTERFACE) {
                     record = read<F0::F0Schema>(*spec, Kind::Pitch, **pitchPool, F0::createAnalyzer);
-                } else if (spec->interface() == Sep::API_INTERFACE) {
+                } else if (spec->interfaceId() == Sep::API_INTERFACE) {
                     record = readSeparation(*spec, **separationPool);
-                } else if (spec->interface() == Beat::API_INTERFACE) {
+                } else if (spec->interfaceId() == Beat::API_INTERFACE) {
                     const auto *schema = dynamic_cast<const Beat::BeatSchema *>(spec->exports());
                     if (schema && schema->maxSegmentDuration == 0 && schema->downbeats)
                         record = read<Beat::BeatSchema>(*spec, Kind::Tempo, **tempoPool, Beat::createBeatTracker);

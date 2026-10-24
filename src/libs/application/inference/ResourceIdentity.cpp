@@ -80,7 +80,7 @@ namespace dssp::inference {
                     // Insert first to represent shared/cyclic edges by identity.
                     nodes.emplace(id, srt::JsonValue{});
                     nodes[id] = srt::JsonObject{
-                        {"interface", target.interface()}, {"variant", target.variant()}, {"level", target.level()},
+                        {"interface", target.interfaceId()}, {"variant", target.variant()}, {"level", target.level()},
                         {"configuration", resourcePaths(target.manifestConfiguration(), target)}, {"exports", resourcePaths(target.manifestExports(), target)},
                         {"imports", importsOf(target, nodes, false)}
                     };

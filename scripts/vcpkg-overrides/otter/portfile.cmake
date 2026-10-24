@@ -3,7 +3,7 @@
 vcpkg_from_git(
     OUT_SOURCE_PATH SOURCE_PATH
     URL https://github.com/diffscope/otter.git
-    REF 7d9eaf51be8817de96bfc122f5237ec4355aaf17
+    REF 6c9b8a0b8f59f2f7dd77f8cc6941f803658275bd
     HEAD_REF spec2.4-uptake
 )
 

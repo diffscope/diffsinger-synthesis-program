@@ -27,7 +27,7 @@ namespace srtbeatinfer::Api::Beat::L1 {
     }
 
     srt::Expected<std::unique_ptr<BeatExecutive>> createBeatTracker(srt::InferenceSpec &spec) {
-        if (spec.interface() != API_INTERFACE || spec.level() != API_LEVEL)
+        if (spec.interfaceId() != API_INTERFACE || spec.level() != API_LEVEL)
             return srt::Error(BeatError::ContractViolation, "Expected a Beat Level 1 inference");
 
         auto made = spec.createInference(BeatImportOptions(spec.variant()), BeatRuntimeOptions(spec.variant()));

@@ -28,7 +28,7 @@ namespace dssp::inference {
             const auto &target = binding->target();
             const auto *exports = dynamic_cast<const Exports *>(target.exports());
             const auto *options = dynamic_cast<const Options *>(imported->options());
-            if (!exports || !options || target.locator().category() != "inference" || target.interface() != exports->interface() || target.variant() != exports->variant() || target.level() != exports->level()) {
+            if (!exports || !options || target.locator().category() != "inference" || target.interfaceId() != exports->interfaceId() || target.variant() != exports->variant() || target.level() != exports->level()) {
                 return std::unexpected{ResourceError("Unsupported language stage contract for " + std::string(role))};
             }
 
@@ -59,7 +59,7 @@ namespace dssp::inference {
 
             const auto &target = imported->binding()->target();
             const auto *spec = dynamic_cast<const wolf::LinguistSpec *>(&target);
-            if (!spec || target.interface() != Linguist::API_INTERFACE || target.variant() != Linguist::API_VARIANT || target.level() != Linguist::API_LEVEL) {
+            if (!spec || target.interfaceId() != Linguist::API_INTERFACE || target.variant() != Linguist::API_VARIANT || target.level() != Linguist::API_LEVEL) {
                 return std::unexpected{ResourceError("Unsupported linguist composition for " + std::string(handle))};
             }
 

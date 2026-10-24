@@ -1,0 +1,10 @@
+cpp-pinyin2 provides the following CMake target:
+
+    find_package(cpp-pinyin2 CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE cpp-pinyin2::cpp-pinyin2)
+
+Dictionary resources are installed under share/cpp-pinyin2/dict. Wolf loads
+its dictionary resources from the installed wolf/g2p-pinyin package.
+
+The library uses Apache-2.0. The dictionary licenses are recorded in the
+installed THIRD_PARTY_NOTICES.md copyright notice.

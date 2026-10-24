@@ -10,18 +10,8 @@
 #include <utility>
 #include <vector>
 
-// Windows SDK headers define interface as a macro; synthrt uses it as an identifier.
-#ifdef _WIN32
-#    pragma push_macro("interface")
-#    undef interface
-#endif
-
 #include <synthrt/Core/PackageHandle.h>
 #include <synthrt/SVS/InferenceContrib.h>
-
-#ifdef _WIN32
-#    pragma pop_macro("interface")
-#endif
 
 #include <dsspinference/InferenceError.h>
 #include <dsspinference/NativeCall.h>

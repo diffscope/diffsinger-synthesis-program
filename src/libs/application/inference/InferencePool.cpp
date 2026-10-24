@@ -112,7 +112,7 @@ namespace dssp::inference {
 
             auto &target = binding->target();
             auto *spec = dynamic_cast<srt::InferenceSpec *>(&target);
-            if (!spec || options->interface() != target.interface() || options->variant() != target.variant() || options->level() != target.level()) {
+            if (!spec || options->interfaceId() != target.interfaceId() || options->variant() != target.variant() || options->level() != target.level()) {
                 return std::unexpected{ExecutionError("Inference runtime options do not match the resolved import")};
             }
             const auto *importOptions = &binding->options();

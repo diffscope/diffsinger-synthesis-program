@@ -5,17 +5,8 @@
 #include <memory>
 #include <utility>
 
-#ifdef _WIN32
-#    pragma push_macro("interface")
-#    undef interface
-#endif
-
 #include <synthrt/Core/ContribExecutive.h>
 #include <synthrt/Task/ITask.h>
-
-#ifdef _WIN32
-#    pragma pop_macro("interface")
-#endif
 
 #include <dsspinference/NativeCall.h>
 

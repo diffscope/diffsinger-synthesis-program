@@ -48,7 +48,7 @@ namespace dssp::arch_diffsinger {
             const auto *schema = dynamic_cast<const Schema *>(target.exports());
             const auto *configuration = dynamic_cast<const Configuration *>(target.configuration());
             const auto *options = dynamic_cast<const Options *>(imported->options());
-            if (!schema || !configuration || !options || target.interface() != schema->interface() || target.variant() != schema->variant() || target.level() != schema->level()) {
+            if (!schema || !configuration || !options || target.interfaceId() != schema->interfaceId() || target.variant() != schema->variant() || target.level() != schema->level()) {
                 return std::unexpected{inference::ResourceError("Unsupported typed stage contract for " + std::string(role))};
             }
 
@@ -396,7 +396,7 @@ namespace dssp::arch_diffsinger {
             std::size_t skipped = 0;
             for (const auto &package : catalog->m_environment->packages()) {
                 for (const auto *contribution : package.contributions("singer")) {
-                    if (contribution->interface() != Ds::API_INTERFACE || contribution->variant() != Ds::API_VARIANT || contribution->level() != Ds::API_LEVEL) {
+                    if (contribution->interfaceId() != Ds::API_INTERFACE || contribution->variant() != Ds::API_VARIANT || contribution->level() != Ds::API_LEVEL) {
                         log.stdcTrace("Ignoring singer contribution %1 in package %2 with a different architecture contract", contribution->locator().contributionId(), package.id());
                         continue;
                     }

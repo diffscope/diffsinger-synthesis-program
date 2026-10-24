@@ -7,9 +7,6 @@
 #include <set>
 #include <utility>
 
-// Parse interface() declarations before provider SDK headers introduce Windows macros.
-#include <synthrt/Core/SynthUnit.h>
-
 #include <onnxruntime_c_api.h>
 #if defined(_WIN32) && __has_include(<dml_provider_factory.h>)
 #    include <dml_provider_factory.h>
@@ -22,6 +19,7 @@
 #include <stdcorelib/scope_guard.h>
 #include <stdcorelib/support/logging.h>
 #include <stdcorelib/support/sharedlibrary.h>
+#include <synthrt/Core/SynthUnit.h>
 #include <wolf/Linguist/LinguistContrib.h>
 
 #include <dsspinference/NativeError.h>

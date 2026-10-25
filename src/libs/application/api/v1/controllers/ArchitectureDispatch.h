@@ -34,7 +34,7 @@ namespace dssp::api_v1::detail {
     }
 
     inline drogon::HttpResponsePtr unknownProcessArchitecture(std::string_view id, const http::RequestLog &context = {}) {
-        return http::problemResponse(http::ValidationError({{"/context/arch", "unsupported", unknownArchitecture(id)}}), context);
+        return architectureProblemResponse(arch::SynthesisErrors{arch::InvalidInputError(unknownArchitecture(id))}, context);
     }
 
     inline arch::CatalogOptions catalogOptions(const drogon::HttpRequest &request) {

@@ -92,11 +92,12 @@ namespace dssp::tests {
         api_v1::SynthesisController synthesis(lifetime, testCatalog());
         synthesis.envTag(jsonRequest(R"({"context":{"arch":"future","archExtra":null,"singers":[{"id":"unknown","extra":null}]}})"), [&](const auto &r) { response = r; });
         EXPECT_EQ(response->statusCode(), drogon::k422UnprocessableEntity);
-        EXPECT_EQ((*response->getJsonObject())["errors"][0]["pointer"].asString(), "/context/arch");
+        EXPECT_EQ((*response->getJsonObject())["type"].asString(), "urn:dssp:error:invalid-input");
+        EXPECT_FALSE(response->getJsonObject()->isMember("errors"));
         startCoroutine(synthesis.pronunciation(jsonRequest(R"({"context":{"arch":"future","archExtra":null,"singer":{"id":"unknown","extra":null}},"input":{"notes":[]}})"), [&](const auto &r) { response = r; }));
         EXPECT_EQ(response->statusCode(), drogon::k422UnprocessableEntity);
-        EXPECT_EQ((*response->getJsonObject())["errors"][0]["pointer"].asString(), "/context/arch");
-        EXPECT_NE((*response->getJsonObject())["errors"][0]["detail"].asString().find("future"), std::string::npos);
+        EXPECT_EQ((*response->getJsonObject())["type"].asString(), "urn:dssp:error:invalid-input");
+        EXPECT_NE((*response->getJsonObject())["detail"].asString().find("future"), std::string::npos);
     }
 
     TEST(Controller, EachControllerUsesItsInjectedSetAndPreservesItsOrder) {
@@ -186,7 +187,7 @@ namespace dssp::tests {
         EXPECT_EQ((*response->getJsonObject())["backgroundUrl"].asString(), "");
     }
 
-    TEST(Controller, PayloadAndSchemaErrorsHaveDistinctStatuses) {
+    TEST(Controller, InvalidPayloadsAndFieldsReturn400AndUnsupportedPayloadsReturn415) {
         auto lifetime = std::make_shared<http::RequestLifetimeRegistry>();
         api_v1::SynthesisController controller(lifetime, testCatalog());
         auto status = [&](const drogon::HttpRequestPtr &request) {
@@ -197,8 +198,8 @@ namespace dssp::tests {
 
         EXPECT_EQ(status(jsonRequest("{")), drogon::k400BadRequest);
         EXPECT_EQ(status(jsonRequest("")), drogon::k400BadRequest);
-        EXPECT_EQ(status(jsonRequest("{}")), drogon::k422UnprocessableEntity);
-        EXPECT_EQ(status(jsonRequest("null")), drogon::k422UnprocessableEntity);
+        EXPECT_EQ(status(jsonRequest("{}")), drogon::k400BadRequest);
+        EXPECT_EQ(status(jsonRequest("null")), drogon::k400BadRequest);
         EXPECT_EQ(status(jsonRequest("{/*comment*/}")), drogon::k400BadRequest);
         EXPECT_EQ(status(jsonRequest(std::string(140, '[') + "0" + std::string(140, ']'))), drogon::k400BadRequest);
         auto unsupported = jsonRequest("{}");
@@ -209,20 +210,27 @@ namespace dssp::tests {
         EXPECT_EQ(status(unsupported), drogon::k415UnsupportedMediaType);
         auto parameters = jsonRequest("{}");
         parameters->addHeader("content-type", "Application/JSON; charset=\"utf-8\"");
-        EXPECT_EQ(status(parameters), drogon::k422UnprocessableEntity);
+        EXPECT_EQ(status(parameters), drogon::k400BadRequest);
         parameters->addHeader("content-type", "application/json; charset=\"unterminated");
         EXPECT_EQ(status(parameters), drogon::k415UnsupportedMediaType);
     }
 
-    TEST(Controller, ExtractionDispatchesUnknownIdsAndUnsupportedKindsAs422) {
+    TEST(Controller, ExtractionDistinguishesRequestValidationFromBusinessRejections) {
         auto lifetime = std::make_shared<http::RequestLifetimeRegistry>();
         const auto environment = inference::Environment::create({});
         ASSERT_TRUE(environment);
         const auto service = extraction::Service::create(*environment);
         ASSERT_TRUE(service);
         api_v1::ExtractionController controller(lifetime, *service);
-        auto request = jsonRequest(R"({"extractor":"unknown","input":{"audioUrl":"https://example.com/a.flac"}})");
         drogon::HttpResponsePtr response;
+        for (const auto body : {"{}", R"({"extractor":"unknown","input":{"audioUrl":7}})", R"({"extractor":"unknown","input":{"audioUrl":"relative.wav"}})"}) {
+            startCoroutine(controller.note(jsonRequest(body), [&](const auto &r) { response = r; }));
+            ASSERT_NE(response, nullptr);
+            EXPECT_EQ(response->statusCode(), drogon::k400BadRequest);
+            EXPECT_EQ((*response->getJsonObject())["status"].asInt(), 400);
+            EXPECT_TRUE(response->getJsonObject()->isMember("errors"));
+        }
+        auto request = jsonRequest(R"({"extractor":"unknown","input":{"audioUrl":"https://example.com/a.flac"}})");
         startCoroutine(controller.note(request, [&](const auto &r) { response = r; }));
         ASSERT_NE(response, nullptr);
         EXPECT_EQ(response->statusCode(), drogon::k422UnprocessableEntity);
@@ -296,11 +304,11 @@ namespace dssp::tests {
         EXPECT_EQ((*response->getJsonObject())["avatarUrl"].asString(), "");
         request->setParameter("acceptableFormats", "not-a-media-type");
         controller.avatar(request, [&](const auto &r) { response = r; }, "diffsinger", "unknown");
-        EXPECT_EQ(response->statusCode(), drogon::k422UnprocessableEntity);
+        EXPECT_EQ(response->statusCode(), drogon::k400BadRequest);
         for (const auto invalid : {"audio/wav;codecs=pcm", "audio/*", "*/*"}) {
             request->setParameter("acceptableFormats", invalid);
             controller.avatar(request, [&](const auto &r) { response = r; }, "diffsinger", "unknown");
-            EXPECT_EQ(response->statusCode(), drogon::k422UnprocessableEntity);
+            EXPECT_EQ(response->statusCode(), drogon::k400BadRequest);
             const auto body = response->getJsonObject();
             ASSERT_NE(body, nullptr);
             EXPECT_EQ((*body)["errors"][0]["pointer"].asString(), "/acceptableFormats/0");

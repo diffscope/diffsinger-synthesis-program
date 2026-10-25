@@ -194,6 +194,21 @@ namespace dssp::tests {
         EXPECT_NE(result.error().get_if<arch::InvalidInputError>(), nullptr);
     }
 
+    TEST_F(SynthesisTest, ExcessiveAudioDurationIsAnInputErrorBeforeLoadingModels) {
+        auto input = audioInput();
+        for (const double duration : {1e6, std::numeric_limits<double>::max()}) {
+            input.piece.pieceDuration = duration;
+            const auto result = await<arch::AudioOutput>([&](auto callback) { m_implementation->audio(input, {}, std::move(callback)); });
+            ASSERT_FALSE(result);
+            EXPECT_NE(result.error().get_if<arch::InvalidInputError>(), nullptr);
+        }
+        for (const auto stage : {arch_diffsinger::SynthesisStage::Acoustic, arch_diffsinger::SynthesisStage::Vocoder}) {
+            const auto pool = m_environment->inferences(arch_diffsinger::synthesisCacheGroup(stage));
+            ASSERT_TRUE(pool);
+            EXPECT_EQ((*pool)->residentCount(), 0U);
+        }
+    }
+
     TEST_F(SynthesisTest, CancelledRequestsFinishBeforeLoadingOrPreparingSynthesis) {
         std::stop_source stop;
         stop.request_stop();

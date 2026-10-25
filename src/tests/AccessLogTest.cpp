@@ -102,7 +102,7 @@ namespace dssp::tests {
         log->finish(*request, *response);
         const auto records = capture.accessRecords();
         ASSERT_EQ(records.size(), 1U);
-        EXPECT_NE(records.front().message.find("status=422"), std::string::npos);
+        EXPECT_NE(records.front().message.find("status=400"), std::string::npos);
         EXPECT_NE(records.front().message.find("error=\"validation\""), std::string::npos);
         EXPECT_NE(records.front().message.find("/input/notes [required]"), std::string::npos);
         EXPECT_EQ(records.front().message.find("private rejected value"), std::string::npos);

@@ -459,6 +459,12 @@ namespace dssp::arch_diffsinger {
                     return std::unexpected{std::move(valid.error())};
                 }
 
+                const auto *vocoderConfiguration = dynamic_cast<const Vo::VocoderConfiguration *>(singer().stages.at("vocoder").spec->configuration());
+                const double sampleCount = std::round(duration * vocoderConfiguration->sampleRate);
+                if (!std::isfinite(sampleCount) || sampleCount > media::maximumWaveSampleCount) {
+                    return fail<arch::SynthesisErrors>(arch::InvalidInputError("Piece duration exceeds the float32 RIFF WAV output limit"));
+                }
+
                 for (const auto &id : context.group->info.audioDependencies) {
                     if (!input.parameters.contains(id)) {
                         return fail<arch::SynthesisErrors>(arch::InvalidInputError("Audio synthesis requires parameter " + id + " for group " + context.group->info.id));

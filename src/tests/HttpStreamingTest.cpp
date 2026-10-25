@@ -238,13 +238,14 @@ namespace dssp::tests {
         EXPECT_EQ(sequence.back()["event"], "result");
         EXPECT_EQ(sequence.back()["data"]["output"]["notes"][0]["pronunciation"], "line\ntext");
 
-        for (const auto &payload : {std::string("{"), std::string("{}"), body("immediate-error"), body("dispatch-error")}) {
+        for (const auto &[payload, expectedStatus] : {std::pair{std::string("{"), 400}, std::pair{std::string("{}"), 400}, std::pair{body("immediate-error"), 422}, std::pair{body("dispatch-error"), 500}}) {
             const auto response = request(payload);
             ASSERT_TRUE(response);
+            EXPECT_EQ(response->statusCode(), drogon::k200OK);
             const auto sequence = events(*response);
             ASSERT_EQ(sequence.size(), 1U);
             EXPECT_EQ(sequence.front()["event"], "error");
-            EXPECT_GE(sequence.front()["data"]["status"].asInt(), 400);
+            EXPECT_EQ(sequence.front()["data"]["status"].asInt(), expectedStatus);
         }
         const auto unsupportedPayload = request(body("success"), "application/x-ndjson", "/v1/synth/pronunciation", "text/plain");
         ASSERT_TRUE(unsupportedPayload);
@@ -258,6 +259,7 @@ namespace dssp::tests {
         const auto unknownEvents = events(*unknownResponse);
         ASSERT_EQ(unknownEvents.size(), 1U);
         EXPECT_EQ(unknownEvents[0]["event"], "error");
+        EXPECT_EQ(unknownEvents[0]["data"]["status"].asInt(), 422);
 
         for (const auto path : {"/v1/synth/phoneme", "/v1/synth/duration", "/v1/synth/parameter", "/v1/synth/audio", "/v1/extract/note", "/v1/extract/pitch", "/v1/extract/tempo", "/v1/extract/separation"}) {
             const auto response = request("{", "application/x-ndjson", path);

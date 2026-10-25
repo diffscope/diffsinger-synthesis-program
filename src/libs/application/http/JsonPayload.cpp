@@ -28,7 +28,7 @@ namespace dssp::http {
 
         // JSONcpp is Drogon's JSON library. Strict mode rejects comments, duplicate
         // keys, trailing data and non-JSON numbers. Scalars are valid JSON and reach
-        // DTO validation, where an object is required (422 rather than 400).
+        // DTO validation, which requires an object.
         try {
             Json::CharReaderBuilder builder;
             Json::CharReaderBuilder::strictMode(&builder.settings_);

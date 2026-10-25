@@ -119,7 +119,7 @@ namespace dssp::media {
     std::expected<std::string, MediaError> waveDataUrl(std::span<const std::uint8_t> pcm, int sampleRate, double duration) {
         static_assert(sizeof(float) == 4 && std::numeric_limits<float>::is_iec559);
         const double count = std::round(duration * sampleRate);
-        if (sampleRate <= 0 || !std::isfinite(duration) || duration < 0 || !std::isfinite(count) || count > (std::numeric_limits<std::uint32_t>::max() - 128) / sizeof(float) || pcm.size() % sizeof(float)) {
+        if (sampleRate <= 0 || !std::isfinite(duration) || duration < 0 || !std::isfinite(count) || count > maximumWaveSampleCount || pcm.size() % sizeof(float)) {
             return std::unexpected{MediaError("PCM size, sample rate or duration cannot be represented by an IEEE float32 RIFF WAV")};
         }
 

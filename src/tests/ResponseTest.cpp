@@ -49,10 +49,11 @@ namespace dssp::tests {
 
     TEST(Response, ValidationProblemsContainReasonsAndPointers) {
         const auto response = http::problemResponse(http::ValidationError({{"/input/notes/0/cent", "maximum", "Too high"}}));
-        ASSERT_EQ(response->statusCode(), drogon::k422UnprocessableEntity);
+        ASSERT_EQ(response->statusCode(), drogon::k400BadRequest);
         EXPECT_EQ(response->contentTypeString(), "application/problem+json");
         const auto json = response->getJsonObject();
         ASSERT_NE(json, nullptr);
+        EXPECT_EQ((*json)["status"].asInt(), 400);
         EXPECT_EQ((*json)["errors"][0]["pointer"].asString(), "/input/notes/0/cent");
         EXPECT_EQ((*json)["errors"][0]["detail"].asString(), "Too high");
     }

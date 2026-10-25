@@ -56,8 +56,8 @@ namespace dssp::http {
     }
 
     drogon::HttpResponsePtr problemResponse(const ValidationError &error, const RequestLog &context) {
-        auto response = problem(422, "validation", "Invalid request", error.message(), context, &error.issues());
-        if (response->statusCode() == drogon::k422UnprocessableEntity) {
+        auto response = problem(400, "validation", "Invalid request", error.message(), context, &error.issues());
+        if (response->statusCode() == drogon::k400BadRequest) {
             // Field locations and rule names explain a rejection without copying
             // submitted values or parser excerpts into the access record.
             std::string reason = "Invalid request fields:";

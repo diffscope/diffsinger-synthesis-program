@@ -1,12 +1,10 @@
 #include "Separation.h"
 
-#include <dr_wav.h>
-
 #include <algorithm>
 #include <atomic>
 #include <cmath>
-#include <limits>
 
+#include <dr_wav.h>
 #include <stdcorelib/str.h>
 
 #include <dsspcodecutil/codecutil.h>
@@ -56,8 +54,6 @@ namespace dssp::extraction {
 
         std::expected<std::string, OperationError> encode(const Sep::AudioSegment &audio) {
             const drwav_data_format format{drwav_container_riff, DR_WAVE_FORMAT_IEEE_FLOAT, static_cast<drwav_uint32>(audio.channelCount), static_cast<drwav_uint32>(audio.sampleRate), 32};
-            if (audio.samples.size() > (std::numeric_limits<std::uint32_t>::max() - 128) / sizeof(float))
-                return std::unexpected{OperationError("Separated track is too large for RIFF WAV")};
             void *bytes = nullptr;
             std::size_t size = 0;
             drwav writer{};
@@ -108,6 +104,10 @@ namespace dssp::extraction {
             }
             if (audio->sampleRate != request->record.sampleRate || audio->channelCount != request->record.channelCount) {
                 request->finish(fail<ExtractionErrors>(InvalidInputError("Extractor " + request->record.id + " requires " + std::to_string(request->record.sampleRate) + " Hz, " + std::to_string(request->record.channelCount) + " channel audio")));
+                co_return;
+            }
+            if (audio->samples.size() > media::maximumWaveSampleCount) {
+                request->finish(fail<ExtractionErrors>(InvalidInputError("Separation audio exceeds the float32 RIFF WAV output limit")));
                 co_return;
             }
 

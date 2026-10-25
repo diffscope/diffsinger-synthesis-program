@@ -45,6 +45,8 @@ namespace dssp::tests {
         const std::array<std::uint8_t, 1> invalid{0};
         EXPECT_FALSE(media::waveDataUrl(invalid, 44100, 1));
         EXPECT_FALSE(media::waveDataUrl({}, 0, 1));
+        EXPECT_FALSE(media::waveDataUrl({}, 44100, 1e6));
+        EXPECT_FALSE(media::waveDataUrl({}, 44100, std::numeric_limits<double>::max()));
         const float nan = std::numeric_limits<float>::quiet_NaN();
         EXPECT_FALSE(media::waveDataUrl(std::span(reinterpret_cast<const std::uint8_t *>(&nan), sizeof(nan)), 44100, 1));
     }

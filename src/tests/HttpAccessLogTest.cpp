@@ -236,14 +236,14 @@ namespace dssp::tests {
             {drogon::Get, "/v1/extractor/note/" + drogon::utils::urlEncodeComponent(drogon::utils::urlEncodeComponent(analysisNoteId)), {}, 404},
             {drogon::Post, "/v1/extract/note", "{", 400},
             {drogon::Post, "/v1/extract/note", unsupportedAudioBody, 422},
-            {drogon::Post, "/v1/extract/tempo", "{}", 422},
-            {drogon::Post, "/v1/extract/separation", "{}", 422},
+            {drogon::Post, "/v1/extract/tempo", "{}", 400},
+            {drogon::Post, "/v1/extract/separation", "{}", 400},
             {drogon::Get, "/v1/arch/unsupported", {}, 404},
             {drogon::Get, "/v1/missing", {}, 404},
             {drogon::Get, "/v1/synth/pronunciation", {}, 405},
             {drogon::Post, "/v1/synth/pronunciation", "{", 400},
             {drogon::Post, "/v1/synth/pronunciation", "text", 415, "text/plain"},
-            {drogon::Post, "/v1/synth/pronunciation", "{}", 422},
+            {drogon::Post, "/v1/synth/pronunciation", "{}", 400},
             {drogon::Post, "/v1/synth/pronunciation", successBody, 200},
             {drogon::Post, "/v1/synth/pronunciation", successBody, 200, "application/json; charset=utf-8"},
             {drogon::Post, "/v1/synth/pronunciation", failureBody, 500},
@@ -268,9 +268,9 @@ namespace dssp::tests {
         const auto queryMedia = "data:application/octet-stream;base64," + drogon::utils::base64Encode("Vendor/voices=1.0:singer/main");
         const auto query = "acceptableFormats=" + drogon::utils::urlEncodeComponent("image/png") + ',' + drogon::utils::urlEncodeComponent("application/vnd.example+json") + "&acceptableSchemes=data,https";
         cases.push_back({drogon::Get, queryPath, {}, 200, "application/json", "avatarUrl", queryMedia, false, query});
-        cases.push_back({drogon::Get, queryPath, {}, 422, "application/json", {}, {}, false, "acceptableFormats=audio%2Fwav%2Caudio%2Fflac"});
-        cases.push_back({drogon::Get, queryPath, {}, 422, "application/json", {}, {}, false, "acceptableFormats=application%2Fvnd.example+json"});
-        cases.push_back({drogon::Get, queryPath, {}, 422, "application/json", {}, {}, false, "acceptableFormats=application%2Fvnd.example%252Bjson"});
+        cases.push_back({drogon::Get, queryPath, {}, 400, "application/json", {}, {}, false, "acceptableFormats=audio%2Fwav%2Caudio%2Fflac"});
+        cases.push_back({drogon::Get, queryPath, {}, 400, "application/json", {}, {}, false, "acceptableFormats=application%2Fvnd.example+json"});
+        cases.push_back({drogon::Get, queryPath, {}, 400, "application/json", {}, {}, false, "acceptableFormats=application%2Fvnd.example%252Bjson"});
         std::set<std::string> ids;
         std::string catalogLength, specificationLength;
         for (std::size_t i = 0; i < cases.size(); ++i) {

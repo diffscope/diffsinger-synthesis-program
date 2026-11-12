@@ -17,6 +17,7 @@
 #include <dsspextraction/Service.h>
 #include <dssphttp/AccessLog.h>
 #include <dssphttp/Response.h>
+#include <dssplocalization/Catalog.h>
 #include <dsspruntime/ServerConfig.h>
 #include <dsspmedia/Resources.h>
 
@@ -124,7 +125,21 @@ namespace dssp {
                 return 1;
             }
 
-            const auto lifetime = std::make_shared<http::RequestLifetimeRegistry>();
+            const auto errorRoot = resourceRoot / "localization" / "errors";
+            const localization::Catalog::Source errorSources[]{
+                {"http", errorRoot / "http"},
+                {"api_v1", errorRoot / "api_v1"},
+                {"diffsinger", errorRoot / "diffsinger"},
+                {"extraction", errorRoot / "extraction"},
+                {"media", errorRoot / "media"},
+            };
+            auto translations = localization::Catalog::load(errorSources, "en_US");
+            if (!translations) {
+                log.stdcCritical("Error message localization initialization failed: %1", translations.error().formatChain());
+                return 1;
+            }
+
+            const auto lifetime = std::make_shared<http::RequestLifetimeRegistry>(*translations);
             const auto accessLog = std::make_shared<http::AccessLog>();
             auto &app = drogon::app();
 
@@ -148,11 +163,11 @@ namespace dssp {
                 accessLog->install(app);
                 configureCors(app);
 
-                app.setExceptionHandler([](const std::exception &error, const drogon::HttpRequestPtr &request, http::Callback &&callback) {
+                app.setExceptionHandler([lifetime](const std::exception &error, const drogon::HttpRequestPtr &request, http::Callback &&callback) {
                     // Drogon's exception boundary is the last safeguard for a
                     // throwing dependency escaping a request adapter.
                     const http::RequestErrors failure{http::HttpBoundaryError("Unhandled error at the HTTP library boundary", std::make_shared<ExternalError>(error.what(), NativeDiagnostic{"Drogon", "handle request", "exception"}))};
-                    callback(http::problemResponse(failure, http::requestLog(*request)));
+                    callback(http::problemResponse(failure, lifetime->responseContext(*request)));
                 });
 
                 api_v1::registerControllers(app, lifetime, *architectures, *extractionService, config->streamHeartbeatInterval);

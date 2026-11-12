@@ -19,9 +19,9 @@ namespace dssp::arch_diffsinger {
         }
 
         template <class Note>
-        arch::SynthesisResult<SynthesisScore> buildScore(const SingerRecord &singer, const arch::Piece<Note> &piece) {
+        arch::SynthesisResult<SynthesisScore> buildScore(const SingerRecord &singer, const arch::Piece<Note> &piece, const localization::Context &locale) {
             if (!std::isfinite(piece.pieceDuration) || piece.pieceDuration < 0) {
-                return fail<arch::SynthesisErrors>(arch::InvalidInputError("Piece duration must be finite and nonnegative"));
+                return fail<arch::SynthesisErrors>(arch::InvalidInputError(locale.text("diffsinger.piece_duration_nonnegative", "Piece duration must be finite and nonnegative")));
             }
 
             SynthesisScore result;
@@ -36,15 +36,15 @@ namespace dssp::arch_diffsinger {
 
             for (std::size_t i = 0; i < piece.notes.size(); ++i) {
                 const auto &note = piece.notes[i];
-                const auto label = "Note " + std::to_string(i);
+                const auto noteIndex = std::to_string(i);
                 if (!std::isfinite(note.position.gap) || note.position.gap < 0 || !std::isfinite(note.position.duration) || note.position.duration < 0 || note.cent > 12800) {
-                    return fail<arch::SynthesisErrors>(arch::InvalidInputError(label + " requires finite nonnegative gap/duration and cent in [0,12800]"));
+                    return fail<arch::SynthesisErrors>(arch::InvalidInputError(locale.text("diffsinger.note_position_or_pitch_invalid", "Note {0} requires finite nonnegative gap/duration and cent in [0,12800]", noteIndex)));
                 }
 
                 const double start = end + note.position.gap;
                 const double nextEnd = start + note.position.duration;
                 if (!std::isfinite(nextEnd) || nextEnd > piece.pieceDuration + 1e-9 * std::max(1.0, piece.pieceDuration)) {
-                    return fail<arch::SynthesisErrors>(arch::InvalidInputError(label + " ends beyond piece duration " + std::to_string(piece.pieceDuration)));
+                    return fail<arch::SynthesisErrors>(arch::InvalidInputError(locale.text("diffsinger.note_exceeds_piece_duration", "Note {0} ends beyond piece duration {1}", noteIndex, std::to_string(piece.pieceDuration))));
                 }
 
                 result.noteStarts.push_back(start);
@@ -53,7 +53,7 @@ namespace dssp::arch_diffsinger {
                 Common::InputNoteInfo nativeNote{static_cast<int>(note.cent / 100), static_cast<int>(note.cent % 100), note.position.duration, Common::GlideType::None, rest};
                 if (note.kind == arch::NoteKind::Slur) {
                     if (!i || note.position.gap != 0 || !note.phonemes.empty() || reserved(singer, piece.notes[i - 1].pronunciation) || result.words.empty() || result.words.back().notes.back().is_rest) {
-                        return fail<arch::SynthesisErrors>(arch::InvalidInputError(label + " is a slur without a contiguous preceding singing note, or introduces phonemes"));
+                        return fail<arch::SynthesisErrors>(arch::InvalidInputError(locale.text("diffsinger.note_slur_invalid", "Note {0} is a slur without a contiguous preceding singing note, or introduces phonemes", noteIndex)));
                     }
                     nativeNote.is_rest = false;
                     result.words.back().notes.push_back(nativeNote);
@@ -61,7 +61,7 @@ namespace dssp::arch_diffsinger {
                     continue;
                 }
                 if (note.kind != arch::NoteKind::Normal) {
-                    return fail<arch::SynthesisErrors>(arch::InvalidInputError(label + " has an unknown note kind"));
+                    return fail<arch::SynthesisErrors>(arch::InvalidInputError(locale.text("diffsinger.note_kind_unknown", "Note {0} has an unknown note kind", noteIndex)));
                 }
 
                 const auto language = note.language.empty() ? singer.info.defaultLanguage : note.language;
@@ -69,9 +69,13 @@ namespace dssp::arch_diffsinger {
                     appendRest(end, note.position.gap, language);
                 }
 
+                if (!rest && note.phonemes.empty()) {
+                    return fail<arch::SynthesisErrors>(arch::InvalidInputError(locale.text("diffsinger.note_phonemes_missing", "Note {0} has no phonemes", noteIndex)));
+                }
+
                 const auto onset = std::ranges::find_if(note.phonemes, [](const auto &phone) { return phone.onset; });
-                if (!rest && (note.phonemes.empty() || onset == note.phonemes.end())) {
-                    return fail<arch::SynthesisErrors>(arch::InvalidInputError(label + " has no singing phoneme group marked with onset"));
+                if (!rest && onset == note.phonemes.end()) {
+                    return fail<arch::SynthesisErrors>(arch::InvalidInputError(locale.text("diffsinger.note_onset_missing", "Note {0} has no singing phoneme group marked with onset", noteIndex)));
                 }
 
                 const std::size_t header = rest ? 0 : static_cast<std::size_t>(onset - note.phonemes.begin());
@@ -86,7 +90,7 @@ namespace dssp::arch_diffsinger {
                 for (std::size_t j = 0; j < note.phonemes.size(); ++j) {
                     const auto &phone = note.phonemes[j];
                     if (phone.token.empty() || !std::isfinite(startOf(phone))) {
-                        return fail<arch::SynthesisErrors>(arch::InvalidInputError(label + " phoneme " + std::to_string(j) + " has an empty token or nonfinite start"));
+                        return fail<arch::SynthesisErrors>(arch::InvalidInputError(locale.text("diffsinger.note_phoneme_invalid", "Note {0} phoneme {1} has an empty token or nonfinite start", noteIndex, std::to_string(j))));
                     }
                     Common::InputPhonemeInfo nativePhone{phone.token, phone.language.empty() ? language : phone.language, 0, startOf(phone), {}};
                     if (j < header) {
@@ -139,20 +143,20 @@ namespace dssp::arch_diffsinger {
         }
     }
 
-    arch::SynthesisResult<SynthesisScore> synthesisScore(const SingerRecord &singer, const arch::Piece<arch::DurationNote> &piece) { return buildScore(singer, piece); }
+    arch::SynthesisResult<SynthesisScore> synthesisScore(const SingerRecord &singer, const arch::Piece<arch::DurationNote> &piece, const localization::Context &locale) { return buildScore(singer, piece, locale); }
 
-    arch::SynthesisResult<SynthesisScore> synthesisScore(const SingerRecord &singer, const arch::Piece<arch::ParameterNote> &piece) { return buildScore(singer, piece); }
+    arch::SynthesisResult<SynthesisScore> synthesisScore(const SingerRecord &singer, const arch::Piece<arch::ParameterNote> &piece, const localization::Context &locale) { return buildScore(singer, piece, locale); }
 
     arch::SynthesisResult<void> validateMix(const SynthesisContext &context, std::span<const std::vector<double>> mix, double rate) {
         if (!std::isfinite(rate) || rate <= 0 || !std::isfinite(1 / rate) || context.sources.empty() || (context.sources.size() > 1 && mix.empty())) {
-            return fail<arch::SynthesisErrors>(arch::InvalidInputError("Speaker mix requires a finite positive rate and samples for multiple sources"));
+            return fail<arch::SynthesisErrors>(arch::InvalidInputError(context.locale.text("diffsinger.speaker_mix_rate_or_samples_invalid", "Speaker mix requires a finite positive rate and samples for multiple sources")));
         }
 
         for (std::size_t i = 0; i < mix.size(); ++i) {
             const auto &row = mix[i];
             const double sum = std::accumulate(row.begin(), row.end(), 0.0);
             if (row.size() + 1 != context.sources.size() || !std::isfinite(sum) || sum > 1 || std::ranges::any_of(row, [](double value) { return !std::isfinite(value) || value < 0 || value > 1; })) {
-                return fail<arch::SynthesisErrors>(arch::InvalidInputError("Speaker mix row " + std::to_string(i) + " must contain N-1 finite weights in [0,1] with sum at most 1"));
+                return fail<arch::SynthesisErrors>(arch::InvalidInputError(context.locale.text("diffsinger.speaker_mix_row_invalid", "Speaker mix row {0} must contain N-1 finite weights in [0,1] with sum at most 1", std::to_string(i))));
             }
         }
 
@@ -170,7 +174,7 @@ namespace dssp::arch_diffsinger {
         for (const auto &source : context.sources) {
             const auto found = source.singer->stages.find(std::string(stage));
             if (found == source.singer->stages.end() || !found->second.spec) {
-                return fail<arch::SynthesisErrors>(arch::InvalidInputError("Singer " + source.singer->info.id + " does not provide stage " + std::string(stage)));
+                return fail<arch::SynthesisErrors>(arch::InvalidInputError(context.locale.text("diffsinger.singer_stage_unavailable", "Singer {0} does not provide stage {1}", source.singer->info.id, stage)));
             }
             const auto &record = found->second;
             if (!record.usesSpeakers) {
@@ -181,12 +185,12 @@ namespace dssp::arch_diffsinger {
             if (!record.speakerMapping.empty()) {
                 const auto mapping = record.speakerMapping.find(target);
                 if (mapping == record.speakerMapping.end()) {
-                    return fail<arch::SynthesisErrors>(arch::InvalidInputError("Singer " + source.singer->info.id + " stage " + std::string(stage) + " cannot map logical speaker " + target));
+                    return fail<arch::SynthesisErrors>(arch::InvalidInputError(context.locale.text("diffsinger.singer_stage_speaker_unmapped", "Singer {0} stage {1} cannot map logical speaker {2}", source.singer->info.id, stage, target)));
                 }
                 target = mapping->second;
             }
             if (!record.embeddedSpeakers.contains(target) || std::ranges::find(record.speakers, target) == record.speakers.end()) {
-                return fail<arch::SynthesisErrors>(arch::InvalidInputError("Singer " + source.singer->info.id + " stage " + std::string(stage) + " has no valid embedding for " + target));
+                return fail<arch::SynthesisErrors>(arch::InvalidInputError(context.locale.text("diffsinger.singer_stage_embedding_missing", "Singer {0} stage {1} has no valid embedding for {2}", source.singer->info.id, stage, target)));
             }
             targets.push_back(std::move(target));
         }

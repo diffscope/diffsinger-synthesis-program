@@ -1,0 +1,20 @@
+zh_CN {
+    accept_task_response { "Accept 必须允许 application/json 或 application/x-ndjson" }
+    http_payload_processing_failed { "无法处理 HTTP 请求内容" }
+    invalid_uri_syntax { "URI 在字节偏移 {0} 处存在语法错误" }
+    json_body_required { "请求体必须包含 JSON" }
+    json_content_type_required { "Content-Type 必须为 application/json" }
+    nonempty_uri_expected { "应为非空的绝对 URI" }
+    request_schema_mismatch { "请求字段不符合 API 规范" }
+    response_serialization_failed { "无法序列化响应" }
+    title_internal_server_error { "服务器内部错误" }
+    title_invalid_input { "输入无效" }
+    title_invalid_request { "请求无效" }
+    title_malformed_json { "JSON 格式错误" }
+    title_not_acceptable { "无法提供请求的响应格式" }
+    title_operation_cancelled { "操作已取消" }
+    title_resource_not_found { "找不到资源" }
+    title_unsupported_payload { "不支持的请求内容" }
+    unsupported_content_encoding { "不支持该 HTTP Content-Encoding" }
+    uri_scheme_expected { "应为包含方案的绝对 URI" }
+}

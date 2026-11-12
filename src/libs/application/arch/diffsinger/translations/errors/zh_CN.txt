@@ -1,0 +1,43 @@
+zh_CN {
+    audio_parameter_required { "分组“{1}”的音频合成需要参数“{0}”" }
+    curve_sampling_grid_invalid { "曲线时长和采样率无法构成可寻址的采样网格" }
+    diffsinger_arch_extra_object { "DiffSinger 的 archExtra 必须为对象" }
+    diffsinger_depth_range { "DiffSinger 的 depth 必须为 0 到 1 之间的有限数值" }
+    diffsinger_group_mixing_unsupported { "分组“{0}”不支持混合多个歌手或音色" }
+    diffsinger_parameter_unknown { "未知的 DiffSinger 参数：{0}" }
+    diffsinger_singer_extra_object { "DiffSinger 歌手“{0}”的 extra 必须为对象" }
+    diffsinger_singer_pipeline_mismatch { "歌手“{0}”的合成流水线与分组“{1}”不一致" }
+    diffsinger_singer_required { "DiffSinger 合成至少需要一个歌手" }
+    diffsinger_speaker_string { "DiffSinger 歌手“{0}”的 speaker 必须为字符串" }
+    diffsinger_speaker_unavailable { "歌手“{0}”没有可选的逻辑音色“{1}”" }
+    diffsinger_steps_object { "DiffSinger 的 steps 必须为对象" }
+    diffsinger_steps_positive_integer { "DiffSinger 的 steps.{0} 必须为正的有符号 64 位整数" }
+    duration_prediction_unsupported { "分组“{0}”不提供时长预测" }
+    group_not_found { "分组不存在：{0}" }
+    group_parameter_unsupported { "分组“{0}”不支持参数“{1}”" }
+    note_exceeds_piece_duration { "音符 {0} 的结束时间超出片段时长 {1}" }
+    note_kind_unknown { "音符 {0} 的类型未知" }
+    note_onset_missing { "音符 {0} 没有带 onset 标记的歌唱音素组" }
+    note_phoneme_invalid { "音符 {0} 的音素 {1} 标记为空，或起始时间不是有限数值" }
+    note_phonemes_missing { "音符 {0} 没有音素" }
+    note_position_or_pitch_invalid { "音符 {0} 的间隔和时长必须为有限的非负数值，音高必须在 0 到 12800 音分之间" }
+    note_slur_invalid { "延音音符 {0} 未紧接前一个歌唱音符，或包含自身的音素" }
+    parameter_normalized_values_required { "参数“{0}”必须使用 0 到 1 之间的有限归一化数值" }
+    parameter_retake_invalid { "参数“{0}”的重算范围无效" }
+    piece_duration_nonnegative { "片段时长必须为有限的非负数值" }
+    pitch_retake_nonempty_piece_required { "重算音高需要时长大于零的片段" }
+    resource_format_unacceptable { "acceptableFormats 不允许资源使用 {0} 格式" }
+    resource_scheme_unacceptable { "acceptableSchemes 不允许资源使用 data 方案" }
+    singer_not_found { "歌手不存在：{0}" }
+    singer_operation_unavailable { "歌手“{0}”不提供 {1}" }
+    singer_stage_embedding_missing { "歌手“{0}”的 {1} 阶段缺少音色“{2}”的有效嵌入向量" }
+    singer_stage_speaker_unmapped { "歌手“{0}”的 {1} 阶段无法映射逻辑音色“{2}”" }
+    singer_stage_unavailable { "歌手“{0}”不提供 {1} 阶段" }
+    speaker_mix_rate_or_samples_invalid { "音色混合需要有限的正采样率，多声源混合还需要权重采样数据" }
+    speaker_mix_row_invalid { "音色混合行 {0}必须包含 N−1 个 0 到 1 之间的有限权重，权重之和不得超过 1" }
+    stage_phoneme_language_unsupported { "{0} 阶段不接受音素标记“{2}”所用的语言“{1}”" }
+    stage_phoneme_token_unsupported { "{0} 阶段不接受词 {1} 的音素 {2} 所用的标记“{3}”" }
+    synth_audio_format_unacceptable { "acceptableFormats 不允许合成音频使用 audio/wav 格式" }
+    synth_audio_scheme_unacceptable { "acceptableSchemes 不允许合成音频使用 data 方案" }
+    synth_audio_wav_size_exceeded { "片段时长超出 float32 RIFF WAV 的输出上限" }
+}

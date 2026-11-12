@@ -1,0 +1,54 @@
+en_US {
+    beat_timestamps_invalid { "Beat tracker returned invalid or unordered timestamps" }
+    extraction_audio_decoding_cancelled { "Audio decoding was canceled" }
+    extraction_background_cancelled { "Extraction background task was canceled" }
+    extraction_background_failed { "Cannot execute extraction background task" }
+    extraction_cancelled { "Extraction was canceled for extractor {0}" }
+    extraction_inference_failed { "Extraction inference failed for extractor {0}" }
+    extraction_request_cancelled { "Extraction request was canceled" }
+    extraction_request_cancelled_for_extractor { "Extraction request was canceled for extractor {0}" }
+    extractor_audio_decode_failed { "Cannot decode audio for extractor {0}" }
+    extractor_audio_invalid { "Invalid audio for extractor {0}: {1}" }
+    extractor_audio_partition_failed { "Cannot partition audio for extractor {0}" }
+    extractor_audio_prepare_failed { "Cannot prepare audio for extractor {0}" }
+    extractor_audio_slicing_cancelled { "Audio slicing was canceled for extractor {0}" }
+    extractor_channel_average_nonfinite { "Audio channel averaging produced a nonfinite sample for extractor {0}" }
+    extractor_localization_failed { "Cannot localize extractor {0}" }
+    extractor_model_result_invalid { "Invalid model result from extractor {0}" }
+    extractor_sample_rate_mismatch { "Extractor {0} requires {1} Hz audio; received {2} Hz" }
+    extractor_type_not_found { "Extractor does not exist for the requested type: {0}" }
+    note_extractor_not_found { "Note extractor does not exist: {0}" }
+    pitch_extractor_not_found { "Pitch extractor does not exist: {0}" }
+    separated_track_contract_violation { "Separated track violates the declared output contract" }
+    separation_audio_decode_failed { "Cannot decode separation audio" }
+    separation_audio_invalid { "Invalid separation audio: {0}" }
+    separation_audio_requirements_mismatch { "Extractor {0} requires {1} Hz, {2} channel audio" }
+    separation_background_cancelled { "Audio separation background task was canceled" }
+    separation_background_failed { "Cannot run audio separation background task" }
+    separation_cancelled { "Audio separation was canceled" }
+    separation_cancelled_for_extractor { "Audio separation was canceled for extractor {0}" }
+    separation_decoding_cancelled { "Separation decoding was canceled" }
+    separation_encoding_cancelled { "Separation encoding was canceled" }
+    separation_extractor_not_found { "Separation extractor does not exist: {0}" }
+    separation_format_unacceptable { "acceptableFormats does not accept the separated audio format audio/wav" }
+    separation_inference_cancelled { "Separation inference was canceled" }
+    separation_inference_failed { "Separation inference failed for {0}" }
+    separation_scheme_unacceptable { "acceptableSchemes does not accept the separated audio scheme data" }
+    separation_track_localization_failed { "Cannot localize separation track {0}" }
+    separation_wav_init_failed { "Cannot initialize separation WAV encoder" }
+    separation_wav_output_failed { "Cannot complete separation WAV output" }
+    separation_wav_size_exceeded { "Separation audio exceeds the float32 RIFF WAV output limit" }
+    separator_track_count_invalid { "Separator returned an unexpected track count" }
+    tempo_audio_decode_failed { "Cannot decode tempo audio" }
+    tempo_audio_invalid { "Invalid tempo audio: {0}" }
+    tempo_background_cancelled { "Tempo background task was canceled" }
+    tempo_background_failed { "Cannot run tempo background task" }
+    tempo_decoding_cancelled { "Tempo audio decoding was canceled" }
+    tempo_extractor_not_found { "Tempo extractor does not exist: {0}" }
+    tempo_inference_cancelled { "Tempo inference was canceled" }
+    tempo_inference_failed { "Tempo inference failed for {0}" }
+    tempo_mixing_cancelled { "Tempo channel mixing was canceled" }
+    tempo_request_cancelled { "Tempo extraction was canceled" }
+    tempo_request_cancelled_for_extractor { "Tempo extraction was canceled for {0}" }
+    tempo_sample_rate_mismatch { "Tempo extractor requires {0} Hz audio" }
+}

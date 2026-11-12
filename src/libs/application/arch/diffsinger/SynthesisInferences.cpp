@@ -46,7 +46,7 @@ namespace dssp::arch_diffsinger {
         }
 
         template <class Configuration>
-        arch::SynthesisResult<void> validateWords(const StageRecord &stage, const std::vector<Common::InputWordInfo> &words, std::string_view name) {
+        arch::SynthesisResult<void> validateWords(const StageRecord &stage, const std::vector<Common::InputWordInfo> &words, std::string_view name, const localization::Context &locale) {
             const auto *configuration = dynamic_cast<const Configuration *>(stage.spec->configuration());
             if (!configuration) {
                 return fail<arch::SynthesisErrors>(arch::OperationError("Missing typed configuration for stage " + std::string(name)));
@@ -57,10 +57,10 @@ namespace dssp::arch_diffsinger {
                     const auto &phone = words[i].phones[j];
                     const auto qualified = phone.language.empty() || phone.token == "SP" || phone.token == "AP" ? phone.token : phone.language + '/' + phone.token;
                     if (!configuration->phonemes.contains(qualified) && !configuration->phonemes.contains(phone.token)) {
-                        return fail<arch::SynthesisErrors>(arch::InvalidInputError("Stage " + std::string(name) + " word " + std::to_string(i) + " phoneme " + std::to_string(j) + " does not accept token " + qualified));
+                        return fail<arch::SynthesisErrors>(arch::InvalidInputError(locale.text("diffsinger.stage_phoneme_token_unsupported", "Stage {0} word {1} phoneme {2} does not accept token {3}", name, std::to_string(i), std::to_string(j), qualified)));
                     }
                     if (configuration->useLanguageId && !configuration->languages.contains(phone.language)) {
-                        return fail<arch::SynthesisErrors>(arch::InvalidInputError("Stage " + std::string(name) + " does not accept phoneme language '" + phone.language + "' for token " + phone.token));
+                        return fail<arch::SynthesisErrors>(arch::InvalidInputError(locale.text("diffsinger.stage_phoneme_language_unsupported", "Stage {0} does not accept phoneme language '{1}' for token {2}", name, phone.language, phone.token)));
                     }
                 }
             }
@@ -171,18 +171,18 @@ namespace dssp::arch_diffsinger {
         return arch::SynthesisErrors{arch::OperationError(context + " failed", error.asError().clone())};
     }
 
-    arch::SynthesisResult<void> validateStageWords(const SingerRecord &singer, SynthesisStage stage, const std::vector<Common::InputWordInfo> &words) {
+    arch::SynthesisResult<void> validateStageWords(const SingerRecord &singer, SynthesisStage stage, const std::vector<Common::InputWordInfo> &words, const localization::Context &locale) {
         const auto name = stageName(stage);
         const auto found = singer.stages.find(std::string(name));
         if (found == singer.stages.end() || !found->second.spec) {
-            return fail<arch::SynthesisErrors>(arch::InvalidInputError("Singer " + singer.info.id + " does not provide " + std::string(name)));
+            return fail<arch::SynthesisErrors>(arch::InvalidInputError(locale.text("diffsinger.singer_operation_unavailable", "Singer {0} does not provide {1}", singer.info.id, name)));
         }
 
         switch (stage) {
-            case SynthesisStage::Duration: return validateWords<Du::DurationConfiguration>(found->second, words, name);
-            case SynthesisStage::Pitch: return validateWords<Pi::PitchConfiguration>(found->second, words, name);
-            case SynthesisStage::Variance: return validateWords<Va::VarianceConfiguration>(found->second, words, name);
-            case SynthesisStage::Acoustic: return validateWords<Ac::AcousticConfiguration>(found->second, words, name);
+            case SynthesisStage::Duration: return validateWords<Du::DurationConfiguration>(found->second, words, name, locale);
+            case SynthesisStage::Pitch: return validateWords<Pi::PitchConfiguration>(found->second, words, name, locale);
+            case SynthesisStage::Variance: return validateWords<Va::VarianceConfiguration>(found->second, words, name, locale);
+            case SynthesisStage::Acoustic: return validateWords<Ac::AcousticConfiguration>(found->second, words, name, locale);
             case SynthesisStage::Vocoder: return {};
         }
         std::unreachable();

@@ -10,34 +10,38 @@ namespace dssp::api_v1 {
     }
 
     void ApplicationController::info(const drogon::HttpRequestPtr &req, http::Callback &&cb) const {
+        const auto context = m_lifetime->responseContext(*req);
         const dto::ApplicationInfoResponse info{{apiVersion}};
-        cb(http::jsonResponse(toJson(info), http::requestLog(*req)));
+        cb(http::jsonResponse(toJson(info), context));
     }
 
     void CatalogController::architectures(const drogon::HttpRequestPtr &req, http::Callback &&cb) const {
+        const auto context = m_lifetime->responseContext(*req);
         std::vector<dto::ArchitectureMetadata> result;
         for (const auto &implementation : m_architectures->entries()) {
-            auto metadata = implementation->metadata(detail::catalogOptions(*req));
+            auto metadata = implementation->metadata(detail::catalogOptions(context));
             if (!metadata) {
-                cb(architectureProblemResponse(metadata.error(), http::requestLog(*req)));
+                cb(architectureProblemResponse(metadata.error(), context));
                 return;
             }
             result.push_back(toDto(std::move(*metadata)));
         }
 
-        cb(http::jsonResponse(toJson(result), http::requestLog(*req)));
+        cb(http::jsonResponse(toJson(result), context));
     }
 
     void CatalogController::architecture(const drogon::HttpRequestPtr &req, http::Callback &&cb, std::string id) const {
-        detail::catalog(*m_architectures, cb, id, detail::catalogOptions(*req), &arch::Architecture::metadata, detail::DtoPresenter{}, http::requestLog(*req));
+        const auto context = m_lifetime->responseContext(*req);
+        detail::catalog(*m_architectures, cb, id, detail::catalogOptions(context), &arch::Architecture::metadata, detail::DtoPresenter{}, context);
     }
 
     void CatalogController::singers(const drogon::HttpRequestPtr &req, http::Callback &&cb) const {
+        const auto context = m_lifetime->responseContext(*req);
         std::vector<dto::SingerInfo> result;
         for (const auto &implementation : m_architectures->entries()) {
-            auto singers = implementation->singers(detail::catalogOptions(*req));
+            auto singers = implementation->singers(detail::catalogOptions(context));
             if (!singers) {
-                cb(architectureProblemResponse(singers.error(), http::requestLog(*req)));
+                cb(architectureProblemResponse(singers.error(), context));
                 return;
             }
             for (auto &singer : *singers) {
@@ -45,55 +49,66 @@ namespace dssp::api_v1 {
             }
         }
 
-        cb(http::jsonResponse(toJson(result), http::requestLog(*req)));
+        cb(http::jsonResponse(toJson(result), context));
     }
 
     void CatalogController::archSingers(const drogon::HttpRequestPtr &req, http::Callback &&cb, std::string id) const {
-        detail::catalog(*m_architectures, cb, id, detail::catalogOptions(*req), &arch::Architecture::singers, detail::DtoPresenter{}, http::requestLog(*req));
+        const auto context = m_lifetime->responseContext(*req);
+        detail::catalog(*m_architectures, cb, id, detail::catalogOptions(context), &arch::Architecture::singers, detail::DtoPresenter{}, context);
     }
 
     void CatalogController::singer(const drogon::HttpRequestPtr &req, http::Callback &&cb, std::string id, std::string singer) const {
-        detail::catalog(*m_architectures, cb, id, arch::ResourceQuery{std::move(singer), detail::catalogOptions(*req)}, &arch::Architecture::singer, detail::DtoPresenter{}, http::requestLog(*req));
+        const auto context = m_lifetime->responseContext(*req);
+        detail::catalog(*m_architectures, cb, id, arch::ResourceQuery{std::move(singer), detail::catalogOptions(context)}, &arch::Architecture::singer, detail::DtoPresenter{}, context);
     }
 
     void CatalogController::avatar(const drogon::HttpRequestPtr &req, http::Callback &&cb, std::string id, std::string singer) const {
-        detail::catalogMedia(*m_architectures, req, cb, id, std::move(singer), &arch::Architecture::avatar, [](std::string url) { return dto::SingerAvatarResponse{std::move(url)}; });
+        const auto context = m_lifetime->responseContext(*req);
+        detail::catalogMedia(*m_architectures, req, cb, id, std::move(singer), &arch::Architecture::avatar, context, [](std::string url) { return dto::SingerAvatarResponse{std::move(url)}; });
     }
 
     void CatalogController::background(const drogon::HttpRequestPtr &req, http::Callback &&cb, std::string id, std::string singer) const {
-        detail::catalogMedia(*m_architectures, req, cb, id, std::move(singer), &arch::Architecture::background, [](std::string url) { return dto::SingerBackgroundResponse{std::move(url)}; });
+        const auto context = m_lifetime->responseContext(*req);
+        detail::catalogMedia(*m_architectures, req, cb, id, std::move(singer), &arch::Architecture::background, context, [](std::string url) { return dto::SingerBackgroundResponse{std::move(url)}; });
     }
 
     void CatalogController::demoAudio(const drogon::HttpRequestPtr &req, http::Callback &&cb, std::string id, std::string singer) const {
-        detail::catalogMedia(*m_architectures, req, cb, id, std::move(singer), &arch::Architecture::demoAudio);
+        const auto context = m_lifetime->responseContext(*req);
+        detail::catalogMedia(*m_architectures, req, cb, id, std::move(singer), &arch::Architecture::demoAudio, context);
     }
 
     void CatalogController::groups(const drogon::HttpRequestPtr &req, http::Callback &&cb, std::string id) const {
-        detail::catalog(*m_architectures, cb, id, detail::catalogOptions(*req), &arch::Architecture::groups, detail::DtoPresenter{}, http::requestLog(*req));
+        const auto context = m_lifetime->responseContext(*req);
+        detail::catalog(*m_architectures, cb, id, detail::catalogOptions(context), &arch::Architecture::groups, detail::DtoPresenter{}, context);
     }
 
     void CatalogController::group(const drogon::HttpRequestPtr &req, http::Callback &&cb, std::string id, std::string group) const {
-        detail::catalog(*m_architectures, cb, id, arch::ResourceQuery{std::move(group), detail::catalogOptions(*req)}, &arch::Architecture::group, detail::DtoPresenter{}, http::requestLog(*req));
+        const auto context = m_lifetime->responseContext(*req);
+        detail::catalog(*m_architectures, cb, id, arch::ResourceQuery{std::move(group), detail::catalogOptions(context)}, &arch::Architecture::group, detail::DtoPresenter{}, context);
     }
 
     void CatalogController::groupSingers(const drogon::HttpRequestPtr &req, http::Callback &&cb, std::string id, std::string group) const {
-        detail::catalog(*m_architectures, cb, id, arch::ResourceQuery{std::move(group), detail::catalogOptions(*req)}, &arch::Architecture::groupSingers, detail::DtoPresenter{}, http::requestLog(*req));
+        const auto context = m_lifetime->responseContext(*req);
+        detail::catalog(*m_architectures, cb, id, arch::ResourceQuery{std::move(group), detail::catalogOptions(context)}, &arch::Architecture::groupSingers, detail::DtoPresenter{}, context);
     }
 
     void SynthesisController::envTag(const drogon::HttpRequestPtr &request, http::Callback &&callback) const {
-        auto input = request->as<Decoded<dto::EnvTagRequest>>();
+        const auto context = m_lifetime->responseContext(*request);
+        auto input = fromHttp<dto::EnvTagRequest>(*request, context.locale);
         if (!input) {
-            callback(http::problemResponse(input.error(), http::requestLog(*request)));
+            callback(http::problemResponse(input.error(), context));
             return;
         }
 
         const auto selected = m_architectures->find(input->context.arch);
         if (!selected) {
-            callback(detail::unknownProcessArchitecture(input->context.arch, http::requestLog(*request)));
+            callback(detail::unknownProcessArchitecture(input->context.arch, context));
             return;
         }
 
-        detail::respond(selected->envTag(toArchitecture(std::move(*input))), callback, [](std::string tag) { return dto::EnvTagResponse{std::move(tag)}; }, http::requestLog(*request));
+        auto parameters = toArchitecture(std::move(*input));
+        parameters.locale = context.locale;
+        detail::respond(selected->envTag(std::move(parameters)), callback, [](std::string tag) { return dto::EnvTagResponse{std::move(tag)}; }, context);
     }
 
     drogon::Task<> SynthesisController::pronunciation(drogon::HttpRequestPtr request, http::Callback callback) const {
@@ -117,23 +132,28 @@ namespace dssp::api_v1 {
     }
 
     void ExtractionController::extractors(const drogon::HttpRequestPtr &req, http::Callback &&cb) const {
-        detail::extractionCatalog(m_service->extractors(req->getHeader("accept-language")), cb, http::requestLog(*req));
+        const auto context = m_lifetime->responseContext(*req);
+        detail::extractionCatalog(m_service->extractors(context.locale), cb, context);
     }
 
     void ExtractionController::noteExtractor(const drogon::HttpRequestPtr &request, http::Callback &&callback, std::string id) const {
-        detail::extractionCatalog(m_service->extractor(extraction::Kind::Note, id, request->getHeader("accept-language")), callback, http::requestLog(*request));
+        const auto context = m_lifetime->responseContext(*request);
+        detail::extractionCatalog(m_service->extractor(extraction::Kind::Note, id, context.locale), callback, context);
     }
 
     void ExtractionController::tempoExtractor(const drogon::HttpRequestPtr &request, http::Callback &&callback, std::string id) const {
-        detail::extractionCatalog(m_service->extractor(extraction::Kind::Tempo, id, request->getHeader("accept-language")), callback, http::requestLog(*request));
+        const auto context = m_lifetime->responseContext(*request);
+        detail::extractionCatalog(m_service->extractor(extraction::Kind::Tempo, id, context.locale), callback, context);
     }
 
     void ExtractionController::pitchExtractor(const drogon::HttpRequestPtr &request, http::Callback &&callback, std::string id) const {
-        detail::extractionCatalog(m_service->extractor(extraction::Kind::Pitch, id, request->getHeader("accept-language")), callback, http::requestLog(*request));
+        const auto context = m_lifetime->responseContext(*request);
+        detail::extractionCatalog(m_service->extractor(extraction::Kind::Pitch, id, context.locale), callback, context);
     }
 
     void ExtractionController::separationExtractor(const drogon::HttpRequestPtr &request, http::Callback &&callback, std::string id) const {
-        detail::extractionCatalog(m_service->extractor(extraction::Kind::Separation, id, request->getHeader("accept-language")), callback, http::requestLog(*request), toSeparationDto);
+        const auto context = m_lifetime->responseContext(*request);
+        detail::extractionCatalog(m_service->extractor(extraction::Kind::Separation, id, context.locale), callback, context, toSeparationDto);
     }
 
     drogon::Task<> ExtractionController::note(drogon::HttpRequestPtr request, http::Callback callback) const {
@@ -153,9 +173,9 @@ namespace dssp::api_v1 {
     }
 
     void registerControllers(drogon::HttpAppFramework &app, const std::shared_ptr<http::RequestLifetimeRegistry> &lifetime, const std::shared_ptr<const arch::ArchitectureCatalog> &architectures, const std::shared_ptr<extraction::Service> &extraction, std::chrono::seconds heartbeatInterval) {
-        app.registerController(std::make_shared<DiscoveryController>());
-        app.registerController(std::make_shared<ApplicationController>());
-        app.registerController(std::make_shared<CatalogController>(architectures));
+        app.registerController(std::make_shared<DiscoveryController>(lifetime));
+        app.registerController(std::make_shared<ApplicationController>(lifetime));
+        app.registerController(std::make_shared<CatalogController>(architectures, lifetime));
         app.registerController(std::make_shared<SynthesisController>(lifetime, architectures, heartbeatInterval));
         app.registerController(std::make_shared<ExtractionController>(lifetime, extraction, heartbeatInterval));
     }

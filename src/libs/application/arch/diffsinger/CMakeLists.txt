@@ -20,3 +20,5 @@ endforeach()
 dssp_sync_include(dssp_arch_diffsinger PREFIX dssparchdiffsinger FORCE)
 
 dssp_add_translations(dssp_arch_diffsinger "${CMAKE_CURRENT_SOURCE_DIR}/translations" "${DSSP_RESOURCE_BUILD_DIR}/localization/diffsinger")
+
+dssp_add_translations(dssp_arch_diffsinger "${CMAKE_CURRENT_SOURCE_DIR}/translations/errors" "${DSSP_RESOURCE_BUILD_DIR}/localization/errors/diffsinger" errors)

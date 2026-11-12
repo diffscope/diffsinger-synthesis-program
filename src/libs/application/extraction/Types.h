@@ -7,6 +7,7 @@
 #include <vector>
 
 #include <dsspextraction/ExtractionError.h>
+#include <dssplocalization/Context.h>
 #include <dsspresource/TaskProgress.h>
 
 namespace dssp::extraction {
@@ -35,6 +36,7 @@ namespace dssp::extraction {
         std::string extractor;
         std::string audioUrl;
         resource::TaskProgress progress;
+        localization::Context locale;
     };
 
     struct SeparationInput : Input {

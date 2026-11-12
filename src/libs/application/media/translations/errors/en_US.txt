@@ -1,0 +1,14 @@
+en_US {
+    audio_base64_invalid { "Audio data is not valid base64" }
+    audio_base64_length_invalid { "Audio data has an invalid base64 length" }
+    audio_base64_noncanonical { "Audio data is not canonical base64" }
+    audio_data_url_components_invalid { "Audio requires data scheme, audio/wav or audio/x-wav MIME, and base64 encoding" }
+    audio_url_invalid { "Audio URL is not a valid absolute URI" }
+    audio_wav_data_url_required { "Audio requires a WAV base64 data URL" }
+    audio_wav_format_unsupported { "Audio WAV has an unsupported container, encoding, channel count or sample rate" }
+    audio_wav_frame_count_invalid { "Audio WAV has an empty or unrepresentable frame count" }
+    audio_wav_frames_truncated { "Audio WAV frame data is truncated" }
+    audio_wav_frames_truncated_or_misaligned { "Audio WAV frame data is truncated or misaligned" }
+    audio_wav_samples_nonfinite { "Audio WAV contains nonfinite samples" }
+    audio_wav_unreadable { "Audio data is not a readable WAV container" }
+}

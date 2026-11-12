@@ -20,13 +20,13 @@
 
 namespace dssp::api_v1::detail {
     template <class T, class Map>
-    void extractionCatalog(extraction::CatalogResult<T> result, const http::Callback &callback, const http::RequestLog &context, Map map) {
+    void extractionCatalog(extraction::CatalogResult<T> result, const http::Callback &callback, const http::ResponseContext &context, Map map) {
         if (!result) callback(extractionProblemResponse(result.error(), context));
         else callback(http::jsonResponse(toJson(std::invoke(map, std::move(*result))), context));
     }
 
     template <class T>
-    void extractionCatalog(extraction::CatalogResult<T> result, const http::Callback &callback, const http::RequestLog &context) {
+    void extractionCatalog(extraction::CatalogResult<T> result, const http::Callback &callback, const http::ResponseContext &context) {
         extractionCatalog(std::move(result), callback, context, [](T value) { return toDto(std::move(value)); });
     }
 
@@ -36,9 +36,7 @@ namespace dssp::api_v1::detail {
         if (context.stopRequested()) co_return;
         const auto representation = http::negotiateTaskResponse(request->getHeader("accept"));
         if (representation == http::TaskRepresentation::Unacceptable) {
-            auto response = http::problemResponse(406, "not-acceptable", "Not acceptable", "Accept must allow application/json or application/x-ndjson", context.logContext());
-            response->addHeader("vary", "Accept");
-            callback(response);
+            callback(http::taskNotAcceptableResponse(context.responseContext()));
             co_return;
         }
         std::shared_ptr<http::TaskStream> stream;
@@ -47,34 +45,35 @@ namespace dssp::api_v1::detail {
             callback = [stream](const auto &response) { stream->finish(response); };
         } else {
             callback = [send = std::move(callback)](const auto &response) {
-                response->addHeader("vary", "Accept");
+                response->addHeader("vary", "Accept, Accept-Language");
                 send(response);
             };
         }
-        auto input = request->as<Decoded<Request>>();
+        auto input = fromHttp<Request>(*request, context.responseContext().locale);
         if (context.stopRequested()) co_return;
         if (!input) {
-            callback(http::problemResponse(input.error(), context.logContext()));
+            callback(http::problemResponse(input.error(), context.responseContext()));
             co_return;
         }
 
         const auto reply = std::make_shared<AsyncReply>(std::move(callback), context, service, operation);
         auto parameters = toExtraction(std::move(*input));
+        parameters.locale = context.responseContext().locale;
         if (stream) parameters.progress = stream->progress();
         auto result = co_await resource::awaitCallback<extraction::ExtractionResult<Output>>([service, parameters = std::move(parameters), context, start](auto complete) mutable {
             try {
                 std::invoke(start, *service, std::move(parameters), context.cancellation(), complete);
             } catch (const std::exception &error) {
-                complete(extraction::ExtractionResult<Output>{fail<extraction::ExtractionErrors>(extraction::OperationError("Cannot dispatch extraction work", std::make_shared<const ExternalError>(error.what(), NativeDiagnostic{"extraction", "dispatch extraction", "exception"})))});
+                complete(extraction::ExtractionResult<Output>{fail<extraction::ExtractionErrors>(extraction::OperationError(context.responseContext().locale.text("api_v1.extraction_dispatch_failed", "Cannot dispatch extraction work"), std::make_shared<const ExternalError>(error.what(), NativeDiagnostic{"extraction", "dispatch extraction", "exception"})))});
             }
         });
         if (!reply->claim()) co_return;
         try {
-            if (!result) reply->send(extractionProblemResponse(result.error(), context.logContext()));
-            else reply->send(http::jsonResponse(toJson(Response{toDto(std::move(*result))}), context.logContext()));
+            if (!result) reply->send(extractionProblemResponse(result.error(), context.responseContext()));
+            else reply->send(http::jsonResponse(toJson(Response{toDto(std::move(*result))}), context.responseContext()));
         } catch (const std::exception &error) {
             const http::RequestErrors failure{http::HttpBoundaryError("Cannot encode an extraction HTTP response", std::make_shared<const ExternalError>(error.what(), NativeDiagnostic{"Drogon/JsonCpp", "encode extraction response", "exception"}))};
-            reply->send(http::problemResponse(failure, context.logContext()));
+            reply->send(http::problemResponse(failure, context.responseContext()));
         }
     }
 }

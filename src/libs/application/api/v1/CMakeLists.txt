@@ -26,3 +26,5 @@ target_link_libraries(dssp_api_v1 PUBLIC dssp_arch dssp_http dssp_extraction)
 target_link_libraries(dssp_api_v1 PUBLIC stdcorelib::stdcorelib)
 
 dssp_sync_include(dssp_api_v1 PREFIX dsspapiv1 FORCE)
+
+dssp_add_translations(dssp_api_v1 "${CMAKE_CURRENT_SOURCE_DIR}/translations/errors" "${DSSP_RESOURCE_BUILD_DIR}/localization/errors/api_v1")

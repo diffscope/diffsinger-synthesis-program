@@ -24,17 +24,19 @@ namespace dssp::api_v1 {
         std::chrono::seconds m_heartbeatInterval;
     };
 
-    class ApplicationController final : public drogon::HttpController<ApplicationController, false> {
+    class ApplicationController final : public drogon::HttpController<ApplicationController, false>, public ControllerSupport {
     public:
+        explicit ApplicationController(std::shared_ptr<http::RequestLifetimeRegistry> lifetime = std::make_shared<http::RequestLifetimeRegistry>()) : ControllerSupport(std::move(lifetime)) {}
+
         METHOD_LIST_BEGIN
             ADD_METHOD_TO(ApplicationController::info, "/v1/info", drogon::Get);
         METHOD_LIST_END
         void info(const drogon::HttpRequestPtr &, http::Callback &&) const;
     };
 
-    class CatalogController final : public drogon::HttpController<CatalogController, false> {
+    class CatalogController final : public drogon::HttpController<CatalogController, false>, public ControllerSupport {
     public:
-        explicit CatalogController(std::shared_ptr<const arch::ArchitectureCatalog> architectures) : m_architectures(std::move(architectures)) {}
+        explicit CatalogController(std::shared_ptr<const arch::ArchitectureCatalog> architectures, std::shared_ptr<http::RequestLifetimeRegistry> lifetime = std::make_shared<http::RequestLifetimeRegistry>()) : ControllerSupport(std::move(lifetime)), m_architectures(std::move(architectures)) {}
 
         METHOD_LIST_BEGIN
             ADD_METHOD_TO(CatalogController::architectures, "/v1/arch", drogon::Get);

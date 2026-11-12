@@ -31,6 +31,7 @@ namespace dssp::api_v1 {
             std::string path;
             std::vector<FieldIssue> &issues;
             std::optional<http::HttpBoundaryError> &boundaryError;
+            const localization::Context &locale;
             void issue(std::string type, std::string reason) const { issues.push_back({path, std::move(type), std::move(reason)}); }
 
             bool object() const {
@@ -40,33 +41,33 @@ namespace dssp::api_v1 {
                 if (value->isObject()) {
                     return true;
                 }
-                issue("type", "Expected an object");
+                issue("type", locale.text("api_v1.field_object_expected", "Expected an object"));
                 return false;
             }
 
             Node field(std::string_view name, bool required = true) const {
                 const auto childPath = path + "/" + escapePointer(name);
                 if (!value || !value->isObject()) {
-                    return {nullptr, childPath, issues, boundaryError};
+                    return {nullptr, childPath, issues, boundaryError, locale};
                 }
                 const std::string key(name);
                 if (!value->isMember(key)) {
                     if (required) {
-                        issues.push_back({childPath, "required", "Required field is missing"});
+                        issues.push_back({childPath, "required", locale.text("api_v1.field_required", "Required field is missing")});
                     }
-                    return {nullptr, childPath, issues, boundaryError};
+                    return {nullptr, childPath, issues, boundaryError, locale};
                 }
-                return {&(*value)[key], childPath, issues, boundaryError};
+                return {&(*value)[key], childPath, issues, boundaryError, locale};
             }
 
-            Node element(Json::ArrayIndex i) const { return {&(*value)[i], path + "/" + std::to_string(i), issues, boundaryError}; }
+            Node element(Json::ArrayIndex i) const { return {&(*value)[i], path + "/" + std::to_string(i), issues, boundaryError, locale}; }
 
             std::string string() const {
                 if (!value) {
                     return {};
                 }
                 if (!value->isString()) {
-                    issue("type", "Expected a string");
+                    issue("type", locale.text("api_v1.field_string_expected", "Expected a string"));
                     return {};
                 }
                 return value->asString();
@@ -77,7 +78,7 @@ namespace dssp::api_v1 {
                     return false;
                 }
                 if (!value->isBool()) {
-                    issue("type", "Expected a boolean");
+                    issue("type", locale.text("api_v1.field_boolean_expected", "Expected a boolean"));
                     return false;
                 }
                 return value->asBool();
@@ -88,16 +89,16 @@ namespace dssp::api_v1 {
                     return 0;
                 }
                 if (!value->isNumeric()) {
-                    issue("type", "Expected a number");
+                    issue("type", locale.text("api_v1.field_number_expected", "Expected a number"));
                     return 0;
                 }
                 const auto result = value->asDouble();
                 if (!std::isfinite(result)) {
-                    issue("finite", "Expected a finite number");
+                    issue("finite", locale.text("api_v1.field_finite_number_expected", "Expected a finite number"));
                 } else if (minimum && (exclusive ? result <= *minimum : result < *minimum)) {
-                    issue(exclusive ? "exclusiveMinimum" : "minimum", "Number is below the allowed range");
+                    issue(exclusive ? "exclusiveMinimum" : "minimum", locale.text("api_v1.field_number_below_range", "Number is below the allowed range"));
                 } else if (maximum && result > *maximum) {
-                    issue("maximum", "Number exceeds the allowed range");
+                    issue("maximum", locale.text("api_v1.field_number_above_range", "Number exceeds the allowed range"));
                 }
                 return result;
             }
@@ -107,16 +108,16 @@ namespace dssp::api_v1 {
                     return 0;
                 }
                 if (!value->isNumeric() || !std::isfinite(value->asDouble()) || std::trunc(value->asDouble()) != value->asDouble()) {
-                    issue("type", "Expected an integer");
+                    issue("type", locale.text("api_v1.field_integer_expected", "Expected an integer"));
                     return 0;
                 }
                 if (!value->isUInt64()) {
-                    issue("minimum", "Expected a nonnegative, representable integer");
+                    issue("minimum", locale.text("api_v1.field_unsigned_integer_expected", "Expected a nonnegative, representable integer"));
                     return 0;
                 }
                 const auto result = value->asUInt64();
                 if (maximum && result > *maximum) {
-                    issue("maximum", "Integer exceeds the allowed range");
+                    issue("maximum", locale.text("api_v1.field_integer_above_range", "Integer exceeds the allowed range"));
                 }
                 return result;
             }
@@ -126,7 +127,7 @@ namespace dssp::api_v1 {
                     return {};
                 }
                 if (!value->isInt64()) {
-                    issue("type", "Expected an integer or null within int64 range");
+                    issue("type", locale.text("api_v1.field_nullable_integer_expected", "Expected an integer or null within int64 range"));
                     return {};
                 }
                 return value->asInt64();
@@ -137,11 +138,11 @@ namespace dssp::api_v1 {
                     return false;
                 }
                 if (!value->isArray()) {
-                    issue("type", "Expected an array");
+                    issue("type", locale.text("api_v1.field_array_expected", "Expected an array"));
                     return false;
                 }
                 if (value->size() < minimum) {
-                    issue("minItems", "Array contains too few items");
+                    issue("minItems", locale.text("api_v1.field_array_too_short", "Array contains too few items"));
                 }
                 return true;
             }
@@ -227,7 +228,7 @@ namespace dssp::api_v1 {
                 if (text == "slur") {
                     result.kind = dto::NoteKind::Slur;
                 } else if (kind.value && kind.value->isString() && text != "normal") {
-                    kind.issue("enum", "Expected normal or slur");
+                    kind.issue("enum", kind.locale.text("api_v1.field_note_kind_expected", "Expected normal or slur"));
                 }
             }
             return result;
@@ -293,7 +294,7 @@ namespace dssp::api_v1 {
                             item.boundaryError = std::move(matched.error());
                         }
                     } else if (!*matched) {
-                        item.issue("format", "Expected MIME type/subtype without parameters or wildcards");
+                        item.issue("format", item.locale.text("api_v1.field_mime_type_expected", "Expected MIME type/subtype without parameters or wildcards"));
                     }
                 }
                 return text;
@@ -318,7 +319,7 @@ namespace dssp::api_v1 {
                 const auto url = input.field("audioUrl");
                 result.input.audioUrl = url.string();
                 if (url.value && url.value->isString()) {
-                    auto checked = http::validateUri(result.input.audioUrl);
+                    auto checked = http::validateUri(result.input.audioUrl, n.locale);
                     if (!checked) {
                         if (const auto *invalid = checked.error().get_if<http::UriSyntaxError>()) {
                             url.issue("format", invalid->message());
@@ -331,10 +332,10 @@ namespace dssp::api_v1 {
         }
 
         template <class T, class Read>
-        std::expected<T, DtoErrors> decode(const Json::Value &json, Read read) {
+        std::expected<T, DtoErrors> decode(const Json::Value &json, const localization::Context &locale, Read read) {
             std::vector<FieldIssue> issues;
             std::optional<http::HttpBoundaryError> boundaryError;
-            Node root{&json, "", issues, boundaryError};
+            Node root{&json, "", issues, boundaryError, locale};
             T result{};
             if (root.object()) {
                 read(root, result);
@@ -352,13 +353,13 @@ namespace dssp::api_v1 {
     }
 
     template <>
-    std::expected<dto::EnvTagRequest, DtoErrors> fromJson<dto::EnvTagRequest>(const Json::Value &json) {
-        return decode<dto::EnvTagRequest>(json, [](const Node &n, auto &r) { r.context = multiContext(n.field("context")); });
+    std::expected<dto::EnvTagRequest, DtoErrors> fromJson<dto::EnvTagRequest>(const Json::Value &json, const localization::Context &locale) {
+        return decode<dto::EnvTagRequest>(json, locale, [](const Node &n, auto &r) { r.context = multiContext(n.field("context")); });
     }
 
     template <>
-    std::expected<dto::PronunciationRequest, DtoErrors> fromJson<dto::PronunciationRequest>(const Json::Value &json) {
-        return decode<dto::PronunciationRequest>(json, [](const Node &n, auto &r) {
+    std::expected<dto::PronunciationRequest, DtoErrors> fromJson<dto::PronunciationRequest>(const Json::Value &json, const localization::Context &locale) {
+        return decode<dto::PronunciationRequest>(json, locale, [](const Node &n, auto &r) {
             r.context = singleContext(n.field("context"));
             const auto input = n.field("input");
             if (input.object()) {
@@ -375,8 +376,8 @@ namespace dssp::api_v1 {
     }
 
     template <>
-    std::expected<dto::PhonemeRequest, DtoErrors> fromJson<dto::PhonemeRequest>(const Json::Value &json) {
-        return decode<dto::PhonemeRequest>(json, [](const Node &n, auto &r) {
+    std::expected<dto::PhonemeRequest, DtoErrors> fromJson<dto::PhonemeRequest>(const Json::Value &json, const localization::Context &locale) {
+        return decode<dto::PhonemeRequest>(json, locale, [](const Node &n, auto &r) {
             r.context = singleContext(n.field("context"));
             const auto input = n.field("input");
             if (input.object()) {
@@ -395,16 +396,16 @@ namespace dssp::api_v1 {
     }
 
     template <>
-    std::expected<dto::DurationRequest, DtoErrors> fromJson<dto::DurationRequest>(const Json::Value &json) {
-        return decode<dto::DurationRequest>(json, [](const Node &n, auto &r) {
+    std::expected<dto::DurationRequest, DtoErrors> fromJson<dto::DurationRequest>(const Json::Value &json, const localization::Context &locale) {
+        return decode<dto::DurationRequest>(json, locale, [](const Node &n, auto &r) {
             r.context = multiContext(n.field("context"));
             piece<dto::DurationInputPhoneme>(n.field("input"), r.input);
         });
     }
 
     template <>
-    std::expected<dto::ParameterRequest, DtoErrors> fromJson<dto::ParameterRequest>(const Json::Value &json) {
-        return decode<dto::ParameterRequest>(json, [](const Node &n, auto &r) {
+    std::expected<dto::ParameterRequest, DtoErrors> fromJson<dto::ParameterRequest>(const Json::Value &json, const localization::Context &locale) {
+        return decode<dto::ParameterRequest>(json, locale, [](const Node &n, auto &r) {
             r.context = multiContext(n.field("context"));
             const auto input = n.field("input");
             piece<dto::ParameterInputPhoneme>(input, r.input);
@@ -415,8 +416,8 @@ namespace dssp::api_v1 {
     }
 
     template <>
-    std::expected<dto::AudioRequest, DtoErrors> fromJson<dto::AudioRequest>(const Json::Value &json) {
-        return decode<dto::AudioRequest>(json, [](const Node &n, auto &r) {
+    std::expected<dto::AudioRequest, DtoErrors> fromJson<dto::AudioRequest>(const Json::Value &json, const localization::Context &locale) {
+        return decode<dto::AudioRequest>(json, locale, [](const Node &n, auto &r) {
             r.context = multiContext(n.field("context"));
             const auto input = n.field("input");
             piece<dto::ParameterInputPhoneme>(input, r.input);
@@ -428,19 +429,19 @@ namespace dssp::api_v1 {
     }
 
     template <>
-    std::expected<dto::ExtractionRequest, DtoErrors> fromJson<dto::ExtractionRequest>(const Json::Value &json) {
-        return decode<dto::ExtractionRequest>(json, extractionRequest);
+    std::expected<dto::ExtractionRequest, DtoErrors> fromJson<dto::ExtractionRequest>(const Json::Value &json, const localization::Context &locale) {
+        return decode<dto::ExtractionRequest>(json, locale, extractionRequest);
     }
 
     template <>
-    std::expected<dto::SeparationExtractionRequest, DtoErrors> fromJson<dto::SeparationExtractionRequest>(const Json::Value &json) {
-        return decode<dto::SeparationExtractionRequest>(json, [](const Node &n, auto &r) {
+    std::expected<dto::SeparationExtractionRequest, DtoErrors> fromJson<dto::SeparationExtractionRequest>(const Json::Value &json, const localization::Context &locale) {
+        return decode<dto::SeparationExtractionRequest>(json, locale, [](const Node &n, auto &r) {
             extractionRequest(n, r);
             acceptableMedia(n, r);
         });
     }
 
-    std::expected<dto::MediaQuery, DtoErrors> mediaQuery(const drogon::HttpRequest &request) {
+    std::expected<dto::MediaQuery, DtoErrors> mediaQuery(const drogon::HttpRequest &request, const localization::Context &locale) {
         dto::MediaQuery result;
         std::vector<FieldIssue> issues;
         auto parameter = [&](const char *name) -> std::pair<std::string_view, bool> {
@@ -480,7 +481,7 @@ namespace dssp::api_v1 {
                         return std::unexpected{std::move(matched.error())};
                     }
                     if (!*matched) {
-                        issues.push_back({std::string("/") + name + "/" + std::to_string(i), "format", "Expected MIME type/subtype without parameters or wildcards"});
+                        issues.push_back({std::string("/") + name + "/" + std::to_string(i), "format", locale.text("api_v1.field_mime_type_expected", "Expected MIME type/subtype without parameters or wildcards")});
                     }
                 }
                 ++i;

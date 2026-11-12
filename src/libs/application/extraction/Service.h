@@ -7,14 +7,15 @@
 
 #include <dsspextraction/Types.h>
 #include <dsspinference/Environment.h>
+#include <dssplocalization/Context.h>
 
 namespace dssp::extraction {
     class Service final {
     public:
         static std::expected<std::shared_ptr<Service>, inference::InitializationError> create(std::shared_ptr<inference::Environment>, double silenceThreshold = 0.02);
         ~Service();
-        CatalogResult<ExtractorList> extractors(std::string_view acceptLanguage = {}) const;
-        CatalogResult<ExtractorInfo> extractor(Kind, std::string_view id, std::string_view acceptLanguage = {}) const;
+        CatalogResult<ExtractorList> extractors(const localization::Context &locale = {}) const;
+        CatalogResult<ExtractorInfo> extractor(Kind, std::string_view id, const localization::Context &locale = {}) const;
         void note(Input, std::stop_token, Completion<NoteOutput>) const;
         void pitch(Input, std::stop_token, Completion<PitchOutput>) const;
         void tempo(Input, std::stop_token, Completion<TempoOutput>) const;

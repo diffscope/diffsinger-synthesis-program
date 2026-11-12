@@ -1,3 +1,4 @@
+#include <filesystem>
 #include <memory>
 #include <stop_token>
 #include <string>
@@ -8,6 +9,7 @@
 #include <gtest/gtest.h>
 
 #include <dsspapiv1/Controllers.h>
+#include <dssplocalization/Catalog.h>
 #include <dssptests/TestArchitecture.h>
 #include <dssptests/TestCoroutine.h>
 
@@ -98,6 +100,50 @@ namespace dssp::tests {
         EXPECT_EQ(response->statusCode(), drogon::k422UnprocessableEntity);
         EXPECT_EQ((*response->getJsonObject())["type"].asString(), "urn:dssp:error:invalid-input");
         EXPECT_NE((*response->getJsonObject())["detail"].asString().find("future"), std::string::npos);
+    }
+
+    TEST(Controller, LocalizesProblemDetailsUsingTheRequestLanguage) {
+        const auto errorRoot = std::filesystem::path(DSSP_TEST_RESOURCE_DIR) / "localization" / "errors";
+        const localization::Catalog::Source sources[]{
+            {"http", errorRoot / "http"},
+            {"api_v1", errorRoot / "api_v1"},
+        };
+        const auto translations = localization::Catalog::load(sources, "en_US");
+        ASSERT_TRUE(translations);
+        auto lifetime = std::make_shared<http::RequestLifetimeRegistry>(*translations);
+        api_v1::CatalogController catalog(testCatalog(), lifetime);
+        api_v1::SynthesisController synthesis(lifetime, testCatalog());
+        drogon::HttpResponsePtr response;
+        const auto receive = [&](const auto &r) { response = r; };
+
+        auto query = drogon::HttpRequest::newHttpRequest();
+        query->addHeader("accept-language", "en-US;q=0.3,zh-CN;q=0.9");
+        catalog.architecture(query, receive, "future");
+        ASSERT_NE(response, nullptr);
+        ASSERT_EQ(response->statusCode(), drogon::k404NotFound);
+        ASSERT_NE(response->getJsonObject(), nullptr);
+        EXPECT_EQ(response->getHeader("vary"), "Accept-Language");
+        EXPECT_EQ((*response->getJsonObject())["type"].asString(), "urn:dssp:error:resource-not-found");
+        EXPECT_EQ((*response->getJsonObject())["title"].asString(), "找不到资源");
+        EXPECT_EQ((*response->getJsonObject())["detail"].asString(), "不支持架构“future”");
+
+        auto malformed = jsonRequest("{}");
+        malformed->addHeader("accept-language", "zh-CN");
+        synthesis.envTag(malformed, receive);
+        ASSERT_EQ(response->statusCode(), drogon::k400BadRequest);
+        ASSERT_NE(response->getJsonObject(), nullptr);
+        EXPECT_EQ((*response->getJsonObject())["title"].asString(), "请求无效");
+        const auto &issue = (*response->getJsonObject())["errors"][0];
+        EXPECT_EQ(issue["pointer"].asString(), "/context");
+        EXPECT_EQ(issue["errorType"].asString(), "required");
+        EXPECT_EQ(issue["detail"].asString(), "缺少必填字段");
+
+        auto unmatched = drogon::HttpRequest::newHttpRequest();
+        unmatched->addHeader("accept-language", "ja-JP");
+        catalog.architecture(unmatched, receive, "future");
+        ASSERT_EQ(response->statusCode(), drogon::k404NotFound);
+        ASSERT_NE(response->getJsonObject(), nullptr);
+        EXPECT_EQ((*response->getJsonObject())["detail"].asString(), "Unsupported architecture: future");
     }
 
     TEST(Controller, EachControllerUsesItsInjectedSetAndPreservesItsOrder) {

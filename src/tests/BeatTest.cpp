@@ -142,7 +142,7 @@ namespace dssp::tests {
     TEST_F(BeatTest, ColdDiscoveryDoesNotOpenModelAndExportsTempoMetadata) {
         start(0, {}, false);
 
-        auto list = m_service->extractors("zh-CN");
+        auto list = m_service->extractors(localization::Context({}, "zh-CN"));
         ASSERT_TRUE(list);
         ASSERT_EQ(list->tempo.size(), 1);
         EXPECT_EQ(list->tempo[0].id, Id);

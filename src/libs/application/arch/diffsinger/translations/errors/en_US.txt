@@ -1,0 +1,43 @@
+en_US {
+    audio_parameter_required { "Audio synthesis requires parameter {0} for group {1}" }
+    curve_sampling_grid_invalid { "Curve duration and sample rate do not define an addressable sampling grid" }
+    diffsinger_arch_extra_object { "DiffSinger archExtra must be an object" }
+    diffsinger_depth_range { "DiffSinger depth must be finite and between 0 and 1" }
+    diffsinger_group_mixing_unsupported { "Group {0} does not permit multiple singer or speaker sources" }
+    diffsinger_parameter_unknown { "Unknown DiffSinger parameter: {0}" }
+    diffsinger_singer_extra_object { "DiffSinger extra must be an object for singer {0}" }
+    diffsinger_singer_pipeline_mismatch { "Singer {0} does not share the complete synthesis pipeline of group {1}" }
+    diffsinger_singer_required { "DiffSinger synthesis requires at least one singer" }
+    diffsinger_speaker_string { "DiffSinger speaker must be a string for singer {0}" }
+    diffsinger_speaker_unavailable { "Singer {0} has no selectable logical speaker ''{1}''" }
+    diffsinger_steps_object { "DiffSinger steps must be an object" }
+    diffsinger_steps_positive_integer { "DiffSinger steps.{0} must be a positive signed 64-bit integer" }
+    duration_prediction_unsupported { "Group {0} does not provide duration prediction" }
+    group_not_found { "Group does not exist: {0}" }
+    group_parameter_unsupported { "Group {0} does not support parameter {1}" }
+    note_exceeds_piece_duration { "Note {0} ends beyond piece duration {1}" }
+    note_kind_unknown { "Note {0} has an unknown note kind" }
+    note_onset_missing { "Note {0} has no singing phoneme group marked with onset" }
+    note_phoneme_invalid { "Note {0} phoneme {1} has an empty token or nonfinite start" }
+    note_phonemes_missing { "Note {0} has no phonemes" }
+    note_position_or_pitch_invalid { "Note {0} requires finite nonnegative gap/duration and cent in [0,12800]" }
+    note_slur_invalid { "Note {0} is a slur without a contiguous preceding singing note, or introduces phonemes" }
+    parameter_normalized_values_required { "Parameter {0} requires finite normalized values in [0,1]" }
+    parameter_retake_invalid { "Invalid retake for parameter {0}" }
+    piece_duration_nonnegative { "Piece duration must be finite and nonnegative" }
+    pitch_retake_nonempty_piece_required { "Pitch retake requires a nonempty piece time axis" }
+    resource_format_unacceptable { "acceptableFormats does not accept the resource format {0}" }
+    resource_scheme_unacceptable { "acceptableSchemes does not accept the resource scheme data" }
+    singer_not_found { "Singer does not exist: {0}" }
+    singer_operation_unavailable { "Singer {0} does not provide {1}" }
+    singer_stage_embedding_missing { "Singer {0} stage {1} has no valid embedding for {2}" }
+    singer_stage_speaker_unmapped { "Singer {0} stage {1} cannot map logical speaker {2}" }
+    singer_stage_unavailable { "Singer {0} does not provide stage {1}" }
+    speaker_mix_rate_or_samples_invalid { "Speaker mix requires a finite positive rate and samples for multiple sources" }
+    speaker_mix_row_invalid { "Speaker mix row {0} must contain N-1 finite weights in [0,1] with sum at most 1" }
+    stage_phoneme_language_unsupported { "Stage {0} does not accept phoneme language ''{1}'' for token {2}" }
+    stage_phoneme_token_unsupported { "Stage {0} word {1} phoneme {2} does not accept token {3}" }
+    synth_audio_format_unacceptable { "acceptableFormats does not accept the synthesized audio format audio/wav" }
+    synth_audio_scheme_unacceptable { "acceptableSchemes does not accept the synthesized audio scheme data" }
+    synth_audio_wav_size_exceeded { "Piece duration exceeds the float32 RIFF WAV output limit" }
+}

@@ -208,7 +208,7 @@ namespace dssp::http {
         }, true);
         response->setStatusCode(drogon::k200OK);
         response->setContentTypeString("application/x-ndjson; charset=utf-8");
-        response->addHeader("vary", "Accept");
+        response->addHeader("vary", "Accept, Accept-Language");
         response->addHeader("cache-control", "no-store");
         response->addHeader("x-accel-buffering", "no");
         state->context.logContext().beginStream();
@@ -226,7 +226,7 @@ namespace dssp::http {
         if (m_state->context.stopRequested()) {
             return;
         }
-        std::string line = "{\"event\":\"error\",\"data\":{\"type\":\"urn:dssp:error:serialization\",\"status\":500,\"title\":\"Internal server error\",\"detail\":\"Response serialization failed\"}}\n";
+        std::string line;
         try {
             const auto data = response->getJsonObject();
             if (data) {
@@ -235,6 +235,9 @@ namespace dssp::http {
         } catch (const std::exception &error) {
             m_state->context.logContext().problem("serialization", "Response serialization failed");
             log.stdcCritical("%1 stream serialization failed: %2", m_state->context.logContext().description(), quoteLogValue(error.what(), 8192));
+        }
+        if (line.empty()) {
+            line = "{\"event\":\"error\",\"data\":" + serializationProblemJson(m_state->context.responseContext()) + "}\n";
         }
         m_state->dispatch([line = std::move(line)](State &state) { state.finish(line); });
     }

@@ -1,0 +1,22 @@
+zh_CN {
+    architecture_operation_cancelled { "合成架构操作已取消" }
+    architecture_operation_failed { "合成架构操作失败" }
+    extraction_dispatch_failed { "无法调度音频分析任务" }
+    field_array_expected { "应为数组" }
+    field_array_too_short { "数组元素不足" }
+    field_boolean_expected { "应为布尔值" }
+    field_finite_number_expected { "应为有限数值" }
+    field_integer_above_range { "整数超出允许范围" }
+    field_integer_expected { "应为整数" }
+    field_mime_type_expected { "应为不含参数或通配符的 MIME 类型，格式为 type/subtype" }
+    field_note_kind_expected { "应为 normal 或 slur" }
+    field_nullable_integer_expected { "应为有符号 64 位整数或 null" }
+    field_number_above_range { "数值超出允许范围" }
+    field_number_below_range { "数值低于允许范围" }
+    field_number_expected { "应为数值" }
+    field_object_expected { "应为对象" }
+    field_required { "缺少必填字段" }
+    field_string_expected { "应为字符串" }
+    field_unsigned_integer_expected { "应为可表示的非负整数" }
+    unknown_architecture { "不支持架构“{0}”" }
+}

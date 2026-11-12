@@ -102,7 +102,7 @@ namespace dssp::arch_diffsinger {
                     return std::unexpected{std::move(valid.error())};
                 }
 
-                auto converted = synthesisScore(*context.sources.front().singer, piece);
+                auto converted = synthesisScore(*context.sources.front().singer, piece, context.locale);
                 if (!converted) {
                     return std::unexpected{std::move(converted.error())};
                 }
@@ -165,7 +165,7 @@ namespace dssp::arch_diffsinger {
                 return std::unexpected{std::move(result.error())};
             }
 
-            auto valid = validateStageWords(request.singer(), stage, result->words);
+            auto valid = validateStageWords(request.singer(), stage, result->words, request.context.locale);
             if (!valid) {
                 return std::unexpected{std::move(valid.error())};
             }
@@ -192,17 +192,17 @@ namespace dssp::arch_diffsinger {
                 for (const auto &[id, parameter] : input.parameters) {
                     const auto capability = context.group->info.parameterPipeline.find(id);
                     if (capability == context.group->info.parameterPipeline.end()) {
-                        return fail<arch::SynthesisErrors>(arch::InvalidInputError("Group " + context.group->info.id + " does not support parameter " + id));
+                        return fail<arch::SynthesisErrors>(arch::InvalidInputError(context.locale.text("diffsinger.group_parameter_unsupported", "Group {0} does not support parameter {1}", context.group->info.id, id)));
                     }
 
-                    auto curve = parameterCurve(id, parameter.values, parameter.sampleRate, duration);
+                    auto curve = parameterCurve(id, parameter.values, parameter.sampleRate, duration, context.locale);
                     if (!curve) {
                         return std::unexpected{std::move(curve.error())};
                     }
                     if (parameter.retake) {
-                        auto range = parameterRetake(*parameter.retake, parameter.sampleRate, duration, std::get_if<arch::IndirectParameter>(&capability->second));
+                        auto range = parameterRetake(*parameter.retake, parameter.sampleRate, duration, std::get_if<arch::IndirectParameter>(&capability->second), context.locale);
                         if (!range) {
-                            return fail<arch::SynthesisErrors>(arch::InvalidInputError("Invalid retake for parameter " + id, range.error().asError().clone()));
+                            return fail<arch::SynthesisErrors>(arch::InvalidInputError(context.locale.text("diffsinger.parameter_retake_invalid", "Invalid retake for parameter {0}", id), range.error().asError().clone()));
                         }
 
                         requested.insert(id);
@@ -215,7 +215,7 @@ namespace dssp::arch_diffsinger {
                                 values.push_back(parameterDefinition(id)->defaultValue);
                             }
                             if (values.size() > 1) {
-                                const auto count = sampleCount(duration, parameter.sampleRate);
+                                const auto count = sampleCount(duration, parameter.sampleRate, context.locale);
                                 if (!count) {
                                     return std::unexpected{count.error()};
                                 }
@@ -234,7 +234,7 @@ namespace dssp::arch_diffsinger {
                     if (curves.contains(id)) {
                         continue;
                     }
-                    auto curve = parameterCurve(id, {}, 100, duration);
+                    auto curve = parameterCurve(id, {}, 100, duration, context.locale);
                     if (!curve) {
                         return std::unexpected{std::move(curve.error())};
                     }
@@ -267,7 +267,7 @@ namespace dssp::arch_diffsinger {
                             return fail<arch::SynthesisErrors>(arch::OperationError("Variance schema exports an unsupported parameter: " + tag.name()));
                         }
                         if (!curves.contains(tag.name())) {
-                            auto curve = parameterCurve(tag.name(), {}, 100, duration);
+                            auto curve = parameterCurve(tag.name(), {}, 100, duration, context.locale);
                             if (!curve) {
                                 return std::unexpected{std::move(curve.error())};
                             }
@@ -325,7 +325,7 @@ namespace dssp::arch_diffsinger {
                 }
 
                 if (duration == 0) {
-                    finish(fail<arch::SynthesisErrors>(arch::InvalidInputError("Pitch retake requires a nonempty piece time axis")));
+                    finish(fail<arch::SynthesisErrors>(arch::InvalidInputError(context.locale.text("diffsinger.pitch_retake_nonempty_piece_required", "Pitch retake requires a nonempty piece time axis"))));
                     co_return;
                 }
 
@@ -448,10 +448,10 @@ namespace dssp::arch_diffsinger {
                     return std::unexpected{std::move(valid.error())};
                 }
                 if (!input.media.acceptableSchemes.empty() && std::ranges::none_of(input.media.acceptableSchemes, [](const auto &value) { return stdc::str::equals_insensitive(value, "data"); })) {
-                    return fail<arch::SynthesisErrors>(arch::InvalidInputError("acceptableSchemes does not accept the synthesized audio scheme data"));
+                    return fail<arch::SynthesisErrors>(arch::InvalidInputError(context.locale.text("diffsinger.synth_audio_scheme_unacceptable", "acceptableSchemes does not accept the synthesized audio scheme data")));
                 }
                 if (!input.media.acceptableFormats.empty() && std::ranges::none_of(input.media.acceptableFormats, [](const auto &value) { return stdc::str::equals_insensitive(value, "audio/wav"); })) {
-                    return fail<arch::SynthesisErrors>(arch::InvalidInputError("acceptableFormats does not accept the synthesized audio format audio/wav"));
+                    return fail<arch::SynthesisErrors>(arch::InvalidInputError(context.locale.text("diffsinger.synth_audio_format_unacceptable", "acceptableFormats does not accept the synthesized audio format audio/wav")));
                 }
 
                 valid = validateMelConfiguration(singer());
@@ -462,21 +462,21 @@ namespace dssp::arch_diffsinger {
                 const auto *vocoderConfiguration = dynamic_cast<const Vo::VocoderConfiguration *>(singer().stages.at("vocoder").spec->configuration());
                 const double sampleCount = std::round(duration * vocoderConfiguration->sampleRate);
                 if (!std::isfinite(sampleCount) || sampleCount > media::maximumWaveSampleCount) {
-                    return fail<arch::SynthesisErrors>(arch::InvalidInputError("Piece duration exceeds the float32 RIFF WAV output limit"));
+                    return fail<arch::SynthesisErrors>(arch::InvalidInputError(context.locale.text("diffsinger.synth_audio_wav_size_exceeded", "Piece duration exceeds the float32 RIFF WAV output limit")));
                 }
 
                 for (const auto &id : context.group->info.audioDependencies) {
                     if (!input.parameters.contains(id)) {
-                        return fail<arch::SynthesisErrors>(arch::InvalidInputError("Audio synthesis requires parameter " + id + " for group " + context.group->info.id));
+                        return fail<arch::SynthesisErrors>(arch::InvalidInputError(context.locale.text("diffsinger.audio_parameter_required", "Audio synthesis requires parameter {0} for group {1}", id, context.group->info.id)));
                     }
                 }
 
                 for (const auto &[id, parameter] : input.parameters) {
                     if (!context.group->info.parameterPipeline.contains(id)) {
-                        return fail<arch::SynthesisErrors>(arch::InvalidInputError("Group " + context.group->info.id + " does not support parameter " + id));
+                        return fail<arch::SynthesisErrors>(arch::InvalidInputError(context.locale.text("diffsinger.group_parameter_unsupported", "Group {0} does not support parameter {1}", context.group->info.id, id)));
                     }
                     const auto values = parameter.values ? std::span<const double>(*parameter.values) : std::span<const double>{};
-                    auto curve = parameterCurve(id, values, parameter.sampleRate, duration);
+                    auto curve = parameterCurve(id, values, parameter.sampleRate, duration, context.locale);
                     if (!curve) {
                         return std::unexpected{std::move(curve.error())};
                     }
@@ -621,7 +621,7 @@ namespace dssp::arch_diffsinger {
             }
 
             if (request->context.group->info.durationMode != arch::DurationMode::Full) {
-                request->finish(fail<arch::SynthesisErrors>(arch::InvalidInputError("Group " + request->context.group->info.id + " does not provide duration prediction")));
+                request->finish(fail<arch::SynthesisErrors>(arch::InvalidInputError(request->context.locale.text("diffsinger.duration_prediction_unsupported", "Group {0} does not provide duration prediction", request->context.group->info.id))));
                 co_return;
             }
 
@@ -636,7 +636,7 @@ namespace dssp::arch_diffsinger {
                 co_return;
             }
 
-            valid = validateStageWords(request->singer(), SynthesisStage::Duration, score->words);
+            valid = validateStageWords(request->singer(), SynthesisStage::Duration, score->words, request->context.locale);
             if (!valid) {
                 request->finish(std::unexpected{std::move(valid.error())});
                 co_return;

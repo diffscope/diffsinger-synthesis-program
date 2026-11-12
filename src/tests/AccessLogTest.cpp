@@ -98,7 +98,7 @@ namespace dssp::tests {
         auto request = drogon::HttpRequest::newHttpRequest();
         auto log = std::make_shared<http::AccessLog>();
         log->begin(*request);
-        auto response = http::problemResponse(http::ValidationError({{"/input/notes", "required", "private rejected value"}}), http::requestLog(*request));
+        auto response = http::problemResponse(http::ValidationError({{"/input/notes", "required", "private rejected value"}}), {http::requestLog(*request)});
         log->finish(*request, *response);
         const auto records = capture.accessRecords();
         ASSERT_EQ(records.size(), 1U);
@@ -141,7 +141,7 @@ namespace dssp::tests {
         log->begin(*request);
         const auto context = http::requestLog(*request);
         const http::RequestErrors error{http::HttpBoundaryError("dependency failed\nmore detail")};
-        const auto response = http::problemResponse(error, context);
+        const auto response = http::problemResponse(error, {context});
         log->finish(*request, *response);
         const auto access = capture.accessRecords();
         const auto failures = capture.records("dssp.http.Response", stdc::Logger::Critical);

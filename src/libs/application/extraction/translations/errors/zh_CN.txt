@@ -1,0 +1,54 @@
+zh_CN {
+    beat_timestamps_invalid { "节拍跟踪器返回的时间戳无效或未按顺序排列" }
+    extraction_audio_decoding_cancelled { "音频解码已取消" }
+    extraction_background_cancelled { "音频分析后台任务已取消" }
+    extraction_background_failed { "无法执行音频分析后台任务" }
+    extraction_cancelled { "分析器“{0}”的音频分析已取消" }
+    extraction_inference_failed { "分析器“{0}”的推理失败" }
+    extraction_request_cancelled { "音频分析请求已取消" }
+    extraction_request_cancelled_for_extractor { "分析器“{0}”的分析请求已取消" }
+    extractor_audio_decode_failed { "无法为分析器“{0}”解码音频" }
+    extractor_audio_invalid { "分析器“{0}”收到无效音频：{1}" }
+    extractor_audio_partition_failed { "无法为分析器“{0}”切分音频" }
+    extractor_audio_prepare_failed { "无法为分析器“{0}”准备音频" }
+    extractor_audio_slicing_cancelled { "分析器“{0}”的音频切片已取消" }
+    extractor_channel_average_nonfinite { "为分析器“{0}”计算声道平均值时产生了非有限采样值" }
+    extractor_localization_failed { "无法本地化分析器“{0}”的名称" }
+    extractor_model_result_invalid { "分析器“{0}”返回了无效的模型结果" }
+    extractor_sample_rate_mismatch { "分析器“{0}”需要 {1} Hz 的音频，收到的采样率为 {2} Hz" }
+    extractor_type_not_found { "找不到所请求类型的分析器：{0}" }
+    note_extractor_not_found { "音符分析器不存在：{0}" }
+    pitch_extractor_not_found { "音高分析器不存在：{0}" }
+    separated_track_contract_violation { "分轨音轨不符合声明的输出约束" }
+    separation_audio_decode_failed { "无法解码分轨的输入音频" }
+    separation_audio_invalid { "分轨的输入音频无效：{0}" }
+    separation_audio_requirements_mismatch { "分析器“{0}”需要 {1} Hz、{2} 声道的音频" }
+    separation_background_cancelled { "音频分轨后台任务已取消" }
+    separation_background_failed { "无法运行音频分轨后台任务" }
+    separation_cancelled { "音频分轨已取消" }
+    separation_cancelled_for_extractor { "分析器“{0}”的音频分轨已取消" }
+    separation_decoding_cancelled { "分轨音频解码已取消" }
+    separation_encoding_cancelled { "分轨音频编码已取消" }
+    separation_extractor_not_found { "分轨分析器不存在：{0}" }
+    separation_format_unacceptable { "acceptableFormats 不允许分轨音频使用 audio/wav 格式" }
+    separation_inference_cancelled { "分轨推理已取消" }
+    separation_inference_failed { "分析器“{0}”的分轨推理失败" }
+    separation_scheme_unacceptable { "acceptableSchemes 不允许分轨音频使用 data 方案" }
+    separation_track_localization_failed { "无法本地化分轨音轨“{0}”的说明" }
+    separation_wav_init_failed { "无法初始化分轨 WAV 编码器" }
+    separation_wav_output_failed { "无法完成分轨 WAV 输出" }
+    separation_wav_size_exceeded { "分轨音频超出 float32 RIFF WAV 的输出上限" }
+    separator_track_count_invalid { "分轨模型返回的音轨数量与预期不符" }
+    tempo_audio_decode_failed { "无法解码节拍分析的输入音频" }
+    tempo_audio_invalid { "节拍分析的输入音频无效：{0}" }
+    tempo_background_cancelled { "节拍分析后台任务已取消" }
+    tempo_background_failed { "无法运行节拍分析后台任务" }
+    tempo_decoding_cancelled { "节拍分析的音频解码已取消" }
+    tempo_extractor_not_found { "节拍分析器不存在：{0}" }
+    tempo_inference_cancelled { "节拍推理已取消" }
+    tempo_inference_failed { "分析器“{0}”的节拍推理失败" }
+    tempo_mixing_cancelled { "节拍分析的声道混合已取消" }
+    tempo_request_cancelled { "节拍分析已取消" }
+    tempo_request_cancelled_for_extractor { "分析器“{0}”的节拍分析已取消" }
+    tempo_sample_rate_mismatch { "节拍分析器需要 {0} Hz 的音频" }
+}

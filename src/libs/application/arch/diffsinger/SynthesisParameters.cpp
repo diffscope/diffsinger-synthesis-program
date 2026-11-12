@@ -74,27 +74,27 @@ namespace dssp::arch_diffsinger {
         return value;
     }
 
-    arch::SynthesisResult<std::size_t> sampleCount(double duration, double rate) {
+    arch::SynthesisResult<std::size_t> sampleCount(double duration, double rate, const localization::Context &locale) {
         const double count = std::ceil(duration * rate);
         if (!std::isfinite(duration) || duration < 0 || !std::isfinite(rate) || rate <= 0 || !std::isfinite(1 / rate) || !std::isfinite(count) || count >= static_cast<double>(std::numeric_limits<std::int64_t>::max()) || count >= static_cast<double>(std::vector<double>{}.max_size())) {
-            return fail<arch::SynthesisErrors>(arch::InvalidInputError("Curve duration and sample rate do not define an addressable sampling grid"));
+            return fail<arch::SynthesisErrors>(arch::InvalidInputError(locale.text("diffsinger.curve_sampling_grid_invalid", "Curve duration and sample rate do not define an addressable sampling grid")));
         }
 
         return static_cast<std::size_t>(count);
     }
 
-    arch::SynthesisResult<Common::InputParameterInfo> parameterCurve(std::string_view id, std::span<const double> values, double rate, double duration) {
+    arch::SynthesisResult<Common::InputParameterInfo> parameterCurve(std::string_view id, std::span<const double> values, double rate, double duration, const localization::Context &locale) {
         const auto *definition = parameterDefinition(id);
         if (!definition) {
-            return fail<arch::SynthesisErrors>(arch::InvalidInputError("Unknown DiffSinger parameter: " + std::string(id)));
+            return fail<arch::SynthesisErrors>(arch::InvalidInputError(locale.text("diffsinger.diffsinger_parameter_unknown", "Unknown DiffSinger parameter: {0}", id)));
         }
 
-        auto count = sampleCount(duration, rate);
+        auto count = sampleCount(duration, rate, locale);
         if (!count) {
             return std::unexpected{std::move(count.error())};
         }
         if (std::ranges::any_of(values, [](double value) { return !std::isfinite(value) || value < 0 || value > 1; })) {
-            return fail<arch::SynthesisErrors>(arch::InvalidInputError("Parameter " + std::string(id) + " requires finite normalized values in [0,1]"));
+            return fail<arch::SynthesisErrors>(arch::InvalidInputError(locale.text("diffsinger.parameter_normalized_values_required", "Parameter {0} requires finite normalized values in [0,1]", id)));
         }
 
         Common::InputParameterInfo result;
@@ -117,8 +117,8 @@ namespace dssp::arch_diffsinger {
         return result;
     }
 
-    arch::SynthesisResult<Common::InputParameterInfo::RetakeRange> parameterRetake(const arch::ParameterRetake &retake, double rate, double duration, const arch::IndirectParameter *capability) {
-        auto count = sampleCount(duration, rate);
+    arch::SynthesisResult<Common::InputParameterInfo::RetakeRange> parameterRetake(const arch::ParameterRetake &retake, double rate, double duration, const arch::IndirectParameter *capability, const localization::Context &locale) {
+        auto count = sampleCount(duration, rate, locale);
         if (!count) {
             return std::unexpected{std::move(count.error())};
         }

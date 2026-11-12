@@ -5,8 +5,8 @@
 #include <dssphttp/Response.h>
 
 namespace dssp::api_v1 {
-    drogon::HttpResponsePtr extractionProblemResponse(const extraction::CatalogErrors &, const http::RequestLog & = {});
-    drogon::HttpResponsePtr extractionProblemResponse(const extraction::ExtractionErrors &, const http::RequestLog & = {});
+    drogon::HttpResponsePtr extractionProblemResponse(const extraction::CatalogErrors &, const http::ResponseContext & = {});
+    drogon::HttpResponsePtr extractionProblemResponse(const extraction::ExtractionErrors &, const http::ResponseContext & = {});
 }
 
 #endif // DSSP_API_V1_CONTROLLERS_EXTRACTIONERRORS_H

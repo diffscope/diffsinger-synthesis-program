@@ -29,16 +29,16 @@ namespace dssp::api_v1::detail {
 
     inline stdc::LogCategory dispatchLog("dssp.api_v1.ArchitectureDispatch");
 
-    inline std::string unknownArchitecture(std::string_view id) {
-        return "Unsupported architecture: " + std::string(id);
+    inline std::string unknownArchitecture(std::string_view id, const localization::Context &locale) {
+        return locale.text("api_v1.unknown_architecture", "Unsupported architecture: {0}", id);
     }
 
-    inline drogon::HttpResponsePtr unknownProcessArchitecture(std::string_view id, const http::RequestLog &context = {}) {
-        return architectureProblemResponse(arch::SynthesisErrors{arch::InvalidInputError(unknownArchitecture(id))}, context);
+    inline drogon::HttpResponsePtr unknownProcessArchitecture(std::string_view id, const http::ResponseContext &context = {}) {
+        return architectureProblemResponse(arch::SynthesisErrors{arch::InvalidInputError(unknownArchitecture(id, context.locale))}, context);
     }
 
-    inline arch::CatalogOptions catalogOptions(const drogon::HttpRequest &request) {
-        return {request.getHeader("accept-language")};
+    inline arch::CatalogOptions catalogOptions(const http::ResponseContext &context) {
+        return {std::string(context.locale.acceptLanguage()), context.locale};
     }
 
     struct DtoPresenter {
@@ -47,7 +47,7 @@ namespace dssp::api_v1::detail {
     };
 
     template <class T, class Errors, class Present = DtoPresenter>
-    void respond(std::expected<T, Errors> result, const http::Callback &callback, Present present = {}, const http::RequestLog &context = {}) {
+    void respond(std::expected<T, Errors> result, const http::Callback &callback, Present present = {}, const http::ResponseContext &context = {}) {
         if (!result) {
             callback(architectureProblemResponse(result.error(), context));
             return;
@@ -57,10 +57,10 @@ namespace dssp::api_v1::detail {
     }
 
     template <class Parameters, class Method, class Present = DtoPresenter>
-    void catalog(const arch::ArchitectureCatalog &architectures, const http::Callback &callback, std::string_view id, Parameters parameters, Method method, Present present = {}, const http::RequestLog &context = {}) {
+    void catalog(const arch::ArchitectureCatalog &architectures, const http::Callback &callback, std::string_view id, Parameters parameters, Method method, Present present = {}, const http::ResponseContext &context = {}) {
         const auto selected = architectures.find(id);
         if (!selected) {
-            callback(architectureProblemResponse(arch::CatalogErrors{arch::ResourceNotFoundError(unknownArchitecture(id))}, context));
+            callback(architectureProblemResponse(arch::CatalogErrors{arch::ResourceNotFoundError(unknownArchitecture(id, context.locale))}, context));
             return;
         }
 
@@ -68,35 +68,35 @@ namespace dssp::api_v1::detail {
     }
 
     template <class Method, class Present = DtoPresenter>
-    void catalogMedia(const arch::ArchitectureCatalog &architectures, const drogon::HttpRequestPtr &request, const http::Callback &callback, std::string_view id, std::string singer, Method method, Present present = {}) {
-        auto query = mediaQuery(*request);
+    void catalogMedia(const arch::ArchitectureCatalog &architectures, const drogon::HttpRequestPtr &request, const http::Callback &callback, std::string_view id, std::string singer, Method method, const http::ResponseContext &context, Present present = {}) {
+        auto query = mediaQuery(*request, context.locale);
         if (!query) {
-            callback(http::problemResponse(widen_errors<http::RequestErrors>(std::move(query.error())), http::requestLog(*request)));
+            callback(http::problemResponse(widen_errors<http::RequestErrors>(std::move(query.error())), context));
             return;
         }
 
-        catalog(architectures, callback, id, arch::SingerMediaQuery{{std::move(singer), catalogOptions(*request)}, toArchitecture(std::move(*query))}, method, std::move(present), http::requestLog(*request));
+        catalog(architectures, callback, id, arch::SingerMediaQuery{{std::move(singer), catalogOptions(context)}, toArchitecture(std::move(*query))}, method, std::move(present), context);
     }
 
     template <class Response, class Output>
     arch::Completion<Output> completion(http::Callback callback, http::RequestContext context, arch::ArchitecturePtr implementation = {}, std::string_view operation = "synthesis") {
-        const auto logContext = context.logContext();
+        const auto response = context.responseContext();
         const auto reply = std::make_shared<AsyncReply>(std::move(callback), std::move(context), std::move(implementation), operation);
-        return [reply, logContext](arch::SynthesisResult<Output> result) {
+        return [reply, response](arch::SynthesisResult<Output> result) {
             if (!reply->claim()) {
                 return;
             }
 
             try {
                 if (!result) {
-                    reply->send(architectureProblemResponse(result.error(), logContext));
+                    reply->send(architectureProblemResponse(result.error(), response));
                     return;
                 }
 
-                reply->send(http::jsonResponse(toJson(Response{toDto(std::move(*result))}), logContext));
+                reply->send(http::jsonResponse(toJson(Response{toDto(std::move(*result))}), response));
             } catch (const std::exception &error) {
                 const http::RequestErrors failure{http::HttpBoundaryError("Cannot encode an asynchronous HTTP response", std::make_shared<const ExternalError>(error.what(), NativeDiagnostic{"Drogon/JsonCpp", "encode asynchronous response", "exception"}))};
-                reply->send(http::problemResponse(failure, logContext));
+                reply->send(http::problemResponse(failure, response));
             }
         };
     }
@@ -110,9 +110,7 @@ namespace dssp::api_v1::detail {
 
         const auto representation = http::negotiateTaskResponse(request->getHeader("accept"));
         if (representation == http::TaskRepresentation::Unacceptable) {
-            auto response = http::problemResponse(406, "not-acceptable", "Not acceptable", "Accept must allow application/json or application/x-ndjson", context.logContext());
-            response->addHeader("vary", "Accept");
-            callback(response);
+            callback(http::taskNotAcceptableResponse(context.responseContext()));
             co_return;
         }
         std::shared_ptr<http::TaskStream> stream;
@@ -121,27 +119,28 @@ namespace dssp::api_v1::detail {
             callback = [stream](const auto &response) { stream->finish(response); };
         } else {
             callback = [send = std::move(callback)](const auto &response) {
-                response->addHeader("vary", "Accept");
+                response->addHeader("vary", "Accept, Accept-Language");
                 send(response);
             };
         }
 
-        auto input = request->as<Decoded<Request>>();
+        auto input = fromHttp<Request>(*request, context.responseContext().locale);
         if (context.stopRequested()) {
             co_return;
         }
         if (!input) {
-            callback(http::problemResponse(input.error(), context.logContext()));
+            callback(http::problemResponse(input.error(), context.responseContext()));
             co_return;
         }
 
         const auto selected = architectures->find(input->context.arch);
         if (!selected) {
-            callback(unknownProcessArchitecture(input->context.arch, context.logContext()));
+            callback(unknownProcessArchitecture(input->context.arch, context.responseContext()));
             co_return;
         }
 
         auto parameters = toArchitecture(std::move(*input));
+        parameters.context.locale = context.responseContext().locale;
         if (stream) parameters.progress = stream->progress();
         if (context.stopRequested()) {
             co_return;
@@ -158,11 +157,11 @@ namespace dssp::api_v1::detail {
         });
         if (!reply->claim()) co_return;
         try {
-            if (!result) reply->send(architectureProblemResponse(result.error(), context.logContext()));
-            else reply->send(http::jsonResponse(toJson(Response{toDto(std::move(*result))}), context.logContext()));
+            if (!result) reply->send(architectureProblemResponse(result.error(), context.responseContext()));
+            else reply->send(http::jsonResponse(toJson(Response{toDto(std::move(*result))}), context.responseContext()));
         } catch (const std::exception &error) {
             const http::RequestErrors failure{http::HttpBoundaryError("Cannot encode an asynchronous HTTP response", std::make_shared<const ExternalError>(error.what(), NativeDiagnostic{"Drogon/JsonCpp", "encode asynchronous response", "exception"}))};
-            reply->send(http::problemResponse(failure, context.logContext()));
+            reply->send(http::problemResponse(failure, context.responseContext()));
         }
     }
 

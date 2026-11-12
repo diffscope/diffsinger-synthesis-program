@@ -1,0 +1,14 @@
+zh_CN {
+    audio_base64_invalid { "音频数据的 Base64 编码无效" }
+    audio_base64_length_invalid { "音频数据的 Base64 编码长度无效" }
+    audio_base64_noncanonical { "音频数据未使用规范的 Base64 编码" }
+    audio_data_url_components_invalid { "音频必须使用 data 方案、audio/wav 或 audio/x-wav MIME 类型及 Base64 编码" }
+    audio_url_invalid { "音频 URL 不是有效的绝对 URI" }
+    audio_wav_data_url_required { "音频必须使用包含 Base64 编码 WAV 数据的 data URL" }
+    audio_wav_format_unsupported { "不支持该 WAV 的容器、编码、声道数或采样率" }
+    audio_wav_frame_count_invalid { "WAV 的音频帧数为零或超出可表示范围" }
+    audio_wav_frames_truncated { "WAV 音频帧数据已截断" }
+    audio_wav_frames_truncated_or_misaligned { "WAV 音频帧数据已截断或未按帧对齐" }
+    audio_wav_samples_nonfinite { "WAV 音频包含非有限采样值" }
+    audio_wav_unreadable { "音频数据不是可读取的 WAV 容器" }
+}

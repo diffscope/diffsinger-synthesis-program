@@ -22,6 +22,7 @@ target_link_libraries(dssp PRIVATE
     dssp_arch_diffsinger
     dssp_runtime
     dssp_inference
+    dssp_localization
     stdcorelib::stdcorelib
     ICU::uc ICU::i18n ICU::data
 )

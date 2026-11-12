@@ -10,6 +10,7 @@
 #include <dsspextraction/BeatTypes.h>
 #include <dsspextraction/Types.h>
 #include <dsspinference/Environment.h>
+#include <dssplocalization/Context.h>
 
 namespace dssp::extraction {
     struct ExtractorRecord {
@@ -30,8 +31,8 @@ namespace dssp::extraction {
     class ExtractorCatalog final {
     public:
         static std::expected<std::shared_ptr<const ExtractorCatalog>, inference::InitializationError> discover(std::shared_ptr<inference::Environment>);
-        CatalogResult<ExtractorList> list(std::string_view acceptLanguage) const;
-        CatalogResult<ExtractorInfo> metadata(Kind, std::string_view id, std::string_view acceptLanguage) const;
+        CatalogResult<ExtractorList> list(const localization::Context &locale) const;
+        CatalogResult<ExtractorInfo> metadata(Kind, std::string_view id, const localization::Context &locale) const;
         const ExtractorRecord *find(Kind, std::string_view id) const;
         const std::shared_ptr<inference::Environment> &environment() const noexcept { return m_environment; }
 

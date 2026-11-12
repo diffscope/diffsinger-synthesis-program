@@ -12,7 +12,7 @@ namespace dssp::tests {
         request->addHeader("accept-language", "zh-CN,en;q=0.5");
         const auto active = registry->track(*request);
         EXPECT_FALSE(active.stopRequested());
-        EXPECT_EQ(active.acceptLanguage(), "zh-CN,en;q=0.5");
+        EXPECT_EQ(active.responseContext().locale.acceptLanguage(), "zh-CN,en;q=0.5");
         registry->cancelAll();
         EXPECT_TRUE(active.stopRequested());
         EXPECT_TRUE(registry->track(*request).stopRequested());

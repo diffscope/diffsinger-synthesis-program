@@ -11,6 +11,7 @@
 #include <stop_token>
 #include <vector>
 
+#include <dssplocalization/Context.h>
 #include <dsspmedia/MediaError.h>
 
 namespace dssp::media {
@@ -26,7 +27,7 @@ namespace dssp::media {
     };
 
     // Decode the actual container in memory; no file access or resampling.
-    std::expected<WaveAudio, MediaInputErrors> readWaveDataUrl(std::string_view, std::stop_token = {});
+    std::expected<WaveAudio, MediaInputErrors> readWaveDataUrl(std::string_view, std::stop_token = {}, const localization::Context &locale = {});
 }
 
 #endif // DSSP_MEDIA_WAVE_H

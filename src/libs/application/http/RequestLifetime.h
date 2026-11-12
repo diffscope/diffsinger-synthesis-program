@@ -6,14 +6,20 @@
 #include <memory>
 #include <mutex>
 #include <stop_token>
-#include <string>
+#include <utility>
 
 #include <drogon/HttpRequest.h>
 
 #include <dssphttp/AccessLog.h>
+#include <dssplocalization/Context.h>
 
 namespace dssp::http {
     class RequestLifetimeRegistry;
+
+    struct ResponseContext {
+        RequestLog log;
+        localization::Context locale;
+    };
 
     // Copy this context into asynchronous work to retain the registration. It does
     // not retain the HTTP body or the connection. Services register std::stop_callback
@@ -26,7 +32,7 @@ namespace dssp::http {
         const RequestLog &logContext() const noexcept;
         std::stop_token cancellation() const noexcept;
         bool stopRequested() const noexcept;
-        const std::string &acceptLanguage() const noexcept;
+        const ResponseContext &responseContext() const noexcept;
 
     private:
         friend class RequestLifetimeRegistry;
@@ -35,6 +41,9 @@ namespace dssp::http {
 
     class RequestLifetimeRegistry : public std::enable_shared_from_this<RequestLifetimeRegistry> {
     public:
+        RequestLifetimeRegistry() = default;
+        explicit RequestLifetimeRegistry(std::shared_ptr<const localization::Catalog> translations) : m_translations(std::move(translations)) {}
+        ResponseContext responseContext(const drogon::HttpRequest &request) const;
         RequestContext track(const drogon::HttpRequest &request);
         void connectionChanged(const trantor::TcpConnectionPtr &connection);
         void cancelAll();
@@ -47,6 +56,7 @@ namespace dssp::http {
             std::weak_ptr<RequestContext::State> state;
         };
 
+        std::shared_ptr<const localization::Catalog> m_translations;
         std::mutex m_mutex;
         std::map<std::uint64_t, Entry> m_requests;
         std::uint64_t m_nextId = 0;

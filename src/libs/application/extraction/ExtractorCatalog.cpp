@@ -88,13 +88,13 @@ namespace dssp::extraction {
             return record;
         }
 
-        CatalogResult<ExtractorInfo> present(const ExtractorRecord &record, std::string_view acceptLanguage) {
-            auto name = inference::localize(record.name, acceptLanguage, record.id);
-            if (!name) return fail<CatalogErrors>(OperationError("Cannot localize extractor " + record.id, name.error().clone()));
+        CatalogResult<ExtractorInfo> present(const ExtractorRecord &record, const localization::Context &locale) {
+            auto name = inference::localize(record.name, locale.acceptLanguage(), record.id);
+            if (!name) return fail<CatalogErrors>(OperationError(locale.text("extraction.extractor_localization_failed", "Cannot localize extractor {0}", record.id), name.error().clone()));
             ExtractorInfo result{record.id, std::move(*name), static_cast<std::uint32_t>(record.sampleRate)};
             for (const auto &track : record.tracks) {
-                auto description = inference::localize(track.description, acceptLanguage, track.id);
-                if (!description) return fail<CatalogErrors>(OperationError("Cannot localize separation track " + track.id, description.error().clone()));
+                auto description = inference::localize(track.description, locale.acceptLanguage(), track.id);
+                if (!description) return fail<CatalogErrors>(OperationError(locale.text("extraction.separation_track_localization_failed", "Cannot localize separation track {0}", track.id), description.error().clone()));
                 result.tracks.push_back({track.id, std::move(*description)});
             }
 
@@ -160,16 +160,16 @@ namespace dssp::extraction {
         return found != m_records.end() && found->second.kind == kind ? &found->second : nullptr;
     }
 
-    CatalogResult<ExtractorInfo> ExtractorCatalog::metadata(Kind kind, std::string_view id, std::string_view acceptLanguage) const {
+    CatalogResult<ExtractorInfo> ExtractorCatalog::metadata(Kind kind, std::string_view id, const localization::Context &locale) const {
         const auto *record = find(kind, id);
-        if (!record) return fail<CatalogErrors>(ResourceNotFoundError("Extractor does not exist for the requested type: " + std::string(id)));
-        return present(*record, acceptLanguage);
+        if (!record) return fail<CatalogErrors>(ResourceNotFoundError(locale.text("extraction.extractor_type_not_found", "Extractor does not exist for the requested type: {0}", id)));
+        return present(*record, locale);
     }
 
-    CatalogResult<ExtractorList> ExtractorCatalog::list(std::string_view acceptLanguage) const {
+    CatalogResult<ExtractorList> ExtractorCatalog::list(const localization::Context &locale) const {
         ExtractorList result;
         for (const auto &[id, record] : m_records) {
-            auto info = present(record, acceptLanguage);
+            auto info = present(record, locale);
             if (!info) return std::unexpected{std::move(info.error())};
             if (record.kind == Kind::Note) result.note.push_back(std::move(*info));
             else if (record.kind == Kind::Pitch) result.pitch.push_back(std::move(*info));

@@ -5,6 +5,7 @@
 #include <string_view>
 
 #include <dssphttp/HttpErrors.h>
+#include <dssplocalization/Context.h>
 
 namespace dssp::http {
     class UriSyntaxError final : public ErrorType<UriSyntaxError> {
@@ -17,7 +18,7 @@ namespace dssp::http {
 
     // RFC 3986 syntax and presence of a scheme only. Scheme negotiation and
     // media parsing remain service responsibilities.
-    std::expected<void, UriErrors> validateUri(std::string_view);
+    std::expected<void, UriErrors> validateUri(std::string_view, const localization::Context &locale = {});
 }
 
 #endif // DSSP_HTTP_URI_H

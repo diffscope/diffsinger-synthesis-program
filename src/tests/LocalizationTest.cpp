@@ -8,6 +8,7 @@
 
 #include <dsspinference/Display.h>
 #include <dssplocalization/Catalog.h>
+#include <dssplocalization/Context.h>
 #include <dssplocalization/LocaleMatcher.h>
 #include <dssptests/TestFiles.h>
 
@@ -79,6 +80,23 @@ namespace dssp::tests {
         const auto incomplete = (*catalog)->text("fallbackOnly", "ja");
         ASSERT_TRUE(incomplete);
         EXPECT_EQ(*incomplete, "English only");
+    }
+
+    TEST(Localization, ModuleCatalogsResolveQualifiedKeysAndUseTheirOwnFallback) {
+        const auto directory = std::filesystem::path(DSSP_TEST_TRANSLATION_DIR);
+        const TestFiles files;
+        ASSERT_TRUE(std::filesystem::copy_file(directory / "en_US.res", files.path() / "en_US.res"));
+
+        const localization::Catalog::Source sources[]{
+            {"first", directory},
+            {"second", files.path()},
+        };
+        const auto catalog = localization::Catalog::load(sources, "en_US");
+        ASSERT_TRUE(catalog);
+        const localization::Context chinese(*catalog, "zh-CN");
+        EXPECT_EQ(chinese.text("first.title", "Default"), "中文");
+        EXPECT_EQ(chinese.text("second.title", "Default"), "English");
+        EXPECT_EQ(chinese.text("third.title", "Default"), "Default");
     }
 
     TEST(Localization, EmptyOrAbsentTranslationDirectoryStillProducesDisplayText) {

@@ -1,10 +1,13 @@
 #include <cmath>
+#include <filesystem>
 #include <limits>
 
 #include <gtest/gtest.h>
 
 #include <dssparchdiffsinger/SynthesisParameters.h>
 #include <dssparchdiffsinger/SynthesisScore.h>
+#include <dssplocalization/Catalog.h>
+#include <dssplocalization/Context.h>
 
 namespace dssp::tests {
     namespace {
@@ -78,6 +81,29 @@ namespace dssp::tests {
         piece.notes[1].position.gap = 0;
         piece.notes[0].pronunciation = "SP";
         EXPECT_FALSE(arch_diffsinger::synthesisScore(singer(), piece));
+    }
+
+    TEST(SynthesisScore, DistinguishesMissingPhonemesFromMissingOnset) {
+        arch::Piece<arch::ParameterNote> piece;
+        piece.pieceDuration = 0.5;
+        piece.notes = {note(0, 0.5, {})};
+        const auto empty = arch_diffsinger::synthesisScore(singer(), piece);
+        ASSERT_FALSE(empty);
+        EXPECT_EQ(empty.error().asError().message(), "Note 0 has no phonemes");
+
+        const auto errorRoot = std::filesystem::path(DSSP_TEST_RESOURCE_DIR) / "localization" / "errors";
+        const localization::Catalog::Source sources[]{{"diffsinger", errorRoot / "diffsinger"}};
+        const auto translations = localization::Catalog::load(sources, "en_US");
+        ASSERT_TRUE(translations);
+        const localization::Context chinese(*translations, "zh-CN");
+        const auto localized = arch_diffsinger::synthesisScore(singer(), piece, chinese);
+        ASSERT_FALSE(localized);
+        EXPECT_EQ(localized.error().asError().message(), "音符 0 没有音素");
+
+        piece.notes[0].phonemes = {{{"a", false, "eng"}, 0}};
+        const auto noOnset = arch_diffsinger::synthesisScore(singer(), piece);
+        ASSERT_FALSE(noOnset);
+        EXPECT_EQ(noOnset.error().asError().message(), "Note 0 has no singing phoneme group marked with onset");
     }
 
     TEST(SynthesisParameters, NonlinearMappingsRoundTripWithoutIntegerQuantization) {

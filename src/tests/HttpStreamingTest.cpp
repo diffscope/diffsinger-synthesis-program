@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <format>
 #include <functional>
 #include <future>
@@ -26,6 +27,7 @@
 
 #include <dsspapiv1/Controllers.h>
 #include <dssphttp/AccessLog.h>
+#include <dssplocalization/Catalog.h>
 #include <dsspresource/TaskProgress.h>
 #include <dssptests/LogCapture.h>
 #include <dssptests/TestArchitecture.h>
@@ -76,7 +78,7 @@ namespace dssp::tests {
         std::vector<Json::Value> events(const drogon::HttpResponse &response) {
             EXPECT_EQ(response.statusCode(), drogon::k200OK);
             EXPECT_TRUE(response.getHeader("content-type").starts_with("application/x-ndjson"));
-            EXPECT_EQ(response.getHeader("vary"), "Accept");
+            EXPECT_EQ(response.getHeader("vary"), "Accept, Accept-Language");
             const auto bytes = response.body();
             EXPECT_FALSE(bytes.empty());
             EXPECT_TRUE(bytes.ends_with('\n'));
@@ -175,7 +177,14 @@ namespace dssp::tests {
             }
         };
 
-        auto lifetime = std::make_shared<http::RequestLifetimeRegistry>();
+        const auto errorRoot = std::filesystem::path(DSSP_TEST_RESOURCE_DIR) / "localization" / "errors";
+        const localization::Catalog::Source sources[]{
+            {"http", errorRoot / "http"},
+            {"api_v1", errorRoot / "api_v1"},
+        };
+        const auto translations = localization::Catalog::load(sources, "en_US");
+        ASSERT_TRUE(translations);
+        auto lifetime = std::make_shared<http::RequestLifetimeRegistry>(*translations);
         auto access = std::make_shared<http::AccessLog>();
         auto &app = drogon::app();
         app.setThreadNum(1);
@@ -207,11 +216,12 @@ namespace dssp::tests {
         ASSERT_EQ(readyStatus, std::future_status::ready);
 
         auto client = drogon::HttpClient::newHttpClient("127.0.0.1", port, false, clientLoop.getLoop());
-        const auto request = [&](std::string payload, std::string accept = "application/x-ndjson", std::string path = "/v1/synth/pronunciation", std::string contentType = "application/json") {
+        const auto request = [&](std::string payload, std::string accept = "application/x-ndjson", std::string path = "/v1/synth/pronunciation", std::string contentType = "application/json", std::string acceptLanguage = {}) {
             auto request = drogon::HttpRequest::newHttpRequest();
             request->setMethod(drogon::Post);
             request->setPath(path);
             request->addHeader("accept", accept);
+            if (!acceptLanguage.empty()) request->addHeader("accept-language", acceptLanguage);
             request->setContentTypeString(contentType);
             request->setBody(std::move(payload));
             auto promise = std::make_shared<std::promise<std::pair<drogon::ReqResult, drogon::HttpResponsePtr>>>();
@@ -254,12 +264,14 @@ namespace dssp::tests {
         EXPECT_EQ(payloadEvents[0]["data"]["status"].asInt(), 415);
         auto unknown = body("success");
         unknown.replace(unknown.find("diffsinger"), std::string("diffsinger").size(), "unknown");
-        const auto unknownResponse = request(unknown);
+        const auto unknownResponse = request(unknown, "application/x-ndjson", "/v1/synth/pronunciation", "application/json", "zh-CN");
         ASSERT_TRUE(unknownResponse);
         const auto unknownEvents = events(*unknownResponse);
         ASSERT_EQ(unknownEvents.size(), 1U);
         EXPECT_EQ(unknownEvents[0]["event"], "error");
         EXPECT_EQ(unknownEvents[0]["data"]["status"].asInt(), 422);
+        EXPECT_EQ(unknownEvents[0]["data"]["title"].asString(), "输入无效");
+        EXPECT_EQ(unknownEvents[0]["data"]["detail"].asString(), "不支持架构“unknown”");
 
         for (const auto path : {"/v1/synth/phoneme", "/v1/synth/duration", "/v1/synth/parameter", "/v1/synth/audio", "/v1/extract/note", "/v1/extract/pitch", "/v1/extract/tempo", "/v1/extract/separation"}) {
             const auto response = request("{", "application/x-ndjson", path);

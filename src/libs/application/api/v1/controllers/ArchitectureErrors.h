@@ -4,12 +4,12 @@
 #include <drogon/HttpResponse.h>
 
 #include <dssparch/Errors.h>
-#include <dssphttp/AccessLog.h>
+#include <dssphttp/Response.h>
 
 namespace dssp::api_v1 {
-    drogon::HttpResponsePtr architectureProblemResponse(const arch::CatalogErrors &errors, const http::RequestLog &context = {});
-    drogon::HttpResponsePtr architectureProblemResponse(const arch::EnvironmentErrors &errors, const http::RequestLog &context = {});
-    drogon::HttpResponsePtr architectureProblemResponse(const arch::SynthesisErrors &errors, const http::RequestLog &context = {});
+    drogon::HttpResponsePtr architectureProblemResponse(const arch::CatalogErrors &errors, const http::ResponseContext &context = {});
+    drogon::HttpResponsePtr architectureProblemResponse(const arch::EnvironmentErrors &errors, const http::ResponseContext &context = {});
+    drogon::HttpResponsePtr architectureProblemResponse(const arch::SynthesisErrors &errors, const http::ResponseContext &context = {});
 }
 
 #endif // DSSP_APIV1_ARCHITECTUREERRORS_H

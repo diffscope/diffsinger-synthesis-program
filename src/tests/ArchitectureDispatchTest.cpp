@@ -115,6 +115,7 @@ namespace dssp::tests {
                 EXPECT_EQ(query.media.acceptableSchemes, (std::vector<std::string>{"https", "data"}));
                 return std::string{};
             },
+            http::RequestLifetimeRegistry{}.responseContext(*request),
             [](std::string url) { return api_v1::dto::SingerAvatarResponse{std::move(url)}; });
         ASSERT_NE(response, nullptr);
         EXPECT_EQ(response->statusCode(), drogon::k200OK);

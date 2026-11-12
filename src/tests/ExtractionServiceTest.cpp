@@ -169,7 +169,7 @@ namespace dssp::tests {
         startService();
         ASSERT_NE(m_service, nullptr);
 
-        const auto list = m_service->extractors("zh-CN");
+        const auto list = m_service->extractors(localization::Context({}, "zh-CN"));
         ASSERT_TRUE(list);
         ASSERT_EQ(list->note.size(), 1U);
         ASSERT_EQ(list->pitch.size(), 1U);

@@ -1,0 +1,22 @@
+en_US {
+    architecture_operation_cancelled { "Architecture operation was canceled" }
+    architecture_operation_failed { "Architecture operation failed" }
+    extraction_dispatch_failed { "Cannot dispatch extraction work" }
+    field_array_expected { "Expected an array" }
+    field_array_too_short { "Array contains too few items" }
+    field_boolean_expected { "Expected a boolean" }
+    field_finite_number_expected { "Expected a finite number" }
+    field_integer_above_range { "Integer exceeds the allowed range" }
+    field_integer_expected { "Expected an integer" }
+    field_mime_type_expected { "Expected MIME type/subtype without parameters or wildcards" }
+    field_note_kind_expected { "Expected normal or slur" }
+    field_nullable_integer_expected { "Expected an integer or null within int64 range" }
+    field_number_above_range { "Number exceeds the allowed range" }
+    field_number_below_range { "Number is below the allowed range" }
+    field_number_expected { "Expected a number" }
+    field_object_expected { "Expected an object" }
+    field_required { "Required field is missing" }
+    field_string_expected { "Expected a string" }
+    field_unsigned_integer_expected { "Expected a nonnegative, representable integer" }
+    unknown_architecture { "Unsupported architecture: {0}" }
+}

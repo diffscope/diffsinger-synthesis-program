@@ -5,16 +5,16 @@
 #include <utility>
 
 namespace dssp::arch_diffsinger {
-    arch::SynthesisResult<SynthesisOptions> synthesisOptions(const Json::Value &extra) {
+    arch::SynthesisResult<SynthesisOptions> synthesisOptions(const Json::Value &extra, const localization::Context &locale) {
         if (!extra.isObject()) {
-            return fail<arch::SynthesisErrors>(arch::InvalidInputError("DiffSinger archExtra must be an object"));
+            return fail<arch::SynthesisErrors>(arch::InvalidInputError(locale.text("diffsinger.diffsinger_arch_extra_object", "DiffSinger archExtra must be an object")));
         }
 
         SynthesisOptions result;
         if (extra.isMember("steps")) {
             const auto &steps = extra["steps"];
             if (!steps.isObject()) {
-                return fail<arch::SynthesisErrors>(arch::InvalidInputError("DiffSinger steps must be an object"));
+                return fail<arch::SynthesisErrors>(arch::InvalidInputError(locale.text("diffsinger.diffsinger_steps_object", "DiffSinger steps must be an object")));
             }
             for (const auto &[stage, target] : {std::pair{"pitch", &result.steps.pitch}, std::pair{"variance", &result.steps.variance}, std::pair{"acoustic", &result.steps.acoustic}}) {
                 if (!steps.isMember(stage)) {
@@ -22,7 +22,7 @@ namespace dssp::arch_diffsinger {
                 }
                 const auto &value = steps[stage];
                 if (!value.isIntegral() || !value.isInt64() || value.asInt64() <= 0) {
-                    return fail<arch::SynthesisErrors>(arch::InvalidInputError("DiffSinger steps." + std::string(stage) + " must be a positive signed 64-bit integer"));
+                    return fail<arch::SynthesisErrors>(arch::InvalidInputError(locale.text("diffsinger.diffsinger_steps_positive_integer", "DiffSinger steps.{0} must be a positive signed 64-bit integer", stage)));
                 }
                 *target = value.asInt64();
             }
@@ -31,7 +31,7 @@ namespace dssp::arch_diffsinger {
         if (extra.isMember("depth")) {
             const auto &depth = extra["depth"];
             if (!depth.isNumeric() || !std::isfinite(depth.asDouble()) || depth.asDouble() < 0 || depth.asDouble() > 1) {
-                return fail<arch::SynthesisErrors>(arch::InvalidInputError("DiffSinger depth must be finite and between 0 and 1"));
+                return fail<arch::SynthesisErrors>(arch::InvalidInputError(locale.text("diffsinger.diffsinger_depth_range", "DiffSinger depth must be finite and between 0 and 1")));
             }
             result.depth = static_cast<float>(depth.asDouble());
         }
@@ -39,44 +39,46 @@ namespace dssp::arch_diffsinger {
         return result;
     }
 
-    arch::SynthesisResult<SingerSource> singerSource(const SingerCatalog &catalog, const arch::Singer &input) {
+    arch::SynthesisResult<SingerSource> singerSource(const SingerCatalog &catalog, const arch::Singer &input, const localization::Context &locale) {
         const auto *singer = catalog.find(input.id);
         if (!singer) {
-            return fail<arch::SynthesisErrors>(arch::InvalidInputError("Singer does not exist: " + input.id));
+            return fail<arch::SynthesisErrors>(arch::InvalidInputError(locale.text("diffsinger.singer_not_found", "Singer does not exist: {0}", input.id)));
         }
         if (!input.extra.isObject()) {
-            return fail<arch::SynthesisErrors>(arch::InvalidInputError("DiffSinger extra must be an object for singer " + input.id));
+            return fail<arch::SynthesisErrors>(arch::InvalidInputError(locale.text("diffsinger.diffsinger_singer_extra_object", "DiffSinger extra must be an object for singer {0}", input.id)));
         }
 
         auto speaker = singer->speakers.empty() ? std::string{} : singer->speakers.front();
         if (input.extra.isMember("speaker")) {
             const auto &value = input.extra["speaker"];
             if (!value.isString()) {
-                return fail<arch::SynthesisErrors>(arch::InvalidInputError("DiffSinger speaker must be a string for singer " + input.id));
+                return fail<arch::SynthesisErrors>(arch::InvalidInputError(locale.text("diffsinger.diffsinger_speaker_string", "DiffSinger speaker must be a string for singer {0}", input.id)));
             }
             speaker = value.asString();
         }
 
         if ((!speaker.empty() && std::ranges::find(singer->speakers, speaker) == singer->speakers.end()) || (speaker.empty() && !singer->speakers.empty())) {
-            return fail<arch::SynthesisErrors>(arch::InvalidInputError("Singer " + input.id + " has no selectable logical speaker '" + speaker + "'"));
+            return fail<arch::SynthesisErrors>(arch::InvalidInputError(locale.text("diffsinger.diffsinger_speaker_unavailable", "Singer {0} has no selectable logical speaker '{1}'", input.id, speaker)));
         }
 
         return SingerSource{singer, std::move(speaker)};
     }
 
     arch::SynthesisResult<SynthesisContext> synthesisContext(const SingerCatalog &catalog, const arch::MultiSingerContext &input) {
-        auto options = synthesisOptions(input.archExtra);
+        const auto &locale = input.locale;
+        auto options = synthesisOptions(input.archExtra, locale);
         if (!options) {
             return std::unexpected{std::move(options.error())};
         }
         if (input.singers.empty()) {
-            return fail<arch::SynthesisErrors>(arch::InvalidInputError("DiffSinger synthesis requires at least one singer"));
+            return fail<arch::SynthesisErrors>(arch::InvalidInputError(locale.text("diffsinger.diffsinger_singer_required", "DiffSinger synthesis requires at least one singer")));
         }
 
         SynthesisContext result;
+        result.locale = locale;
         result.options = *options;
         for (const auto &inputSinger : input.singers) {
-            auto source = singerSource(catalog, inputSinger);
+            auto source = singerSource(catalog, inputSinger, locale);
             if (!source) {
                 return std::unexpected{std::move(source.error())};
             }
@@ -87,12 +89,12 @@ namespace dssp::arch_diffsinger {
                 }
                 result.group = &found->second;
             } else if (result.group->info.id != source->singer->info.group) {
-                return fail<arch::SynthesisErrors>(arch::InvalidInputError("Singer " + source->singer->info.id + " does not share the complete synthesis pipeline of group " + result.group->info.id));
+                return fail<arch::SynthesisErrors>(arch::InvalidInputError(locale.text("diffsinger.diffsinger_singer_pipeline_mismatch", "Singer {0} does not share the complete synthesis pipeline of group {1}", source->singer->info.id, result.group->info.id)));
             }
             result.sources.push_back(std::move(*source));
         }
         if (result.sources.size() > 1 && !result.group->info.mixable) {
-            return fail<arch::SynthesisErrors>(arch::InvalidInputError("Group " + result.group->info.id + " does not permit multiple singer or speaker sources"));
+            return fail<arch::SynthesisErrors>(arch::InvalidInputError(locale.text("diffsinger.diffsinger_group_mixing_unsupported", "Group {0} does not permit multiple singer or speaker sources", result.group->info.id)));
         }
 
         return result;

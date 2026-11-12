@@ -44,10 +44,10 @@ namespace dssp::arch_diffsinger {
                 return fail<arch::CatalogErrors>(arch::OperationError("Cannot read the declared singer media resource", resource.error().clone()));
             }
             if (!query.media.acceptableSchemes.empty() && std::ranges::none_of(query.media.acceptableSchemes, [](const auto &scheme) { return stdc::str::equals_insensitive(scheme, "data"); })) {
-                return fail<arch::CatalogErrors>(arch::InvalidInputError("acceptableSchemes does not accept the resource scheme data"));
+                return fail<arch::CatalogErrors>(arch::InvalidInputError(query.singer.display.locale.text("diffsinger.resource_scheme_unacceptable", "acceptableSchemes does not accept the resource scheme data")));
             }
             if (!query.media.acceptableFormats.empty() && std::ranges::none_of(query.media.acceptableFormats, [&](const auto &format) { return stdc::str::equals_insensitive(format, resource->mime); })) {
-                return fail<arch::CatalogErrors>(arch::InvalidInputError("acceptableFormats does not accept the resource format " + resource->mime));
+                return fail<arch::CatalogErrors>(arch::InvalidInputError(query.singer.display.locale.text("diffsinger.resource_format_unacceptable", "acceptableFormats does not accept the resource format {0}", resource->mime)));
             }
 
             return std::move(resource->dataUrl);
@@ -87,7 +87,7 @@ namespace dssp::arch_diffsinger {
         return catalogueCall<std::optional<arch::SingerInfo>>([&]() -> arch::CatalogResult<std::optional<arch::SingerInfo>> {
             const auto *record = m_catalog->find(query.id);
             if (!record) {
-                return fail<arch::CatalogErrors>(arch::ResourceNotFoundError("Singer does not exist: " + query.id));
+                return fail<arch::CatalogErrors>(arch::ResourceNotFoundError(query.display.locale.text("diffsinger.singer_not_found", "Singer does not exist: {0}", query.id)));
             }
 
             auto info = singerInfo(*record, query.display);
@@ -103,7 +103,7 @@ namespace dssp::arch_diffsinger {
         return catalogueCall<std::string>([&]() -> arch::CatalogResult<std::string> {
             const auto *record = m_catalog->find(query.singer.id);
             if (!record) {
-                return fail<arch::CatalogErrors>(arch::ResourceNotFoundError("Singer does not exist: " + query.singer.id));
+                return fail<arch::CatalogErrors>(arch::ResourceNotFoundError(query.singer.display.locale.text("diffsinger.singer_not_found", "Singer does not exist: {0}", query.singer.id)));
             }
 
             return mediaUrl(*m_media, *record, record->avatar, query, media::Kind::Image);
@@ -114,7 +114,7 @@ namespace dssp::arch_diffsinger {
         return catalogueCall<std::string>([&]() -> arch::CatalogResult<std::string> {
             const auto *record = m_catalog->find(query.singer.id);
             if (!record) {
-                return fail<arch::CatalogErrors>(arch::ResourceNotFoundError("Singer does not exist: " + query.singer.id));
+                return fail<arch::CatalogErrors>(arch::ResourceNotFoundError(query.singer.display.locale.text("diffsinger.singer_not_found", "Singer does not exist: {0}", query.singer.id)));
             }
 
             return mediaUrl(*m_media, *record, record->background, query, media::Kind::Image);
@@ -125,7 +125,7 @@ namespace dssp::arch_diffsinger {
         return catalogueCall<std::vector<arch::SingerDemoAudio>>([&]() -> arch::CatalogResult<std::vector<arch::SingerDemoAudio>> {
             const auto *record = m_catalog->find(query.singer.id);
             if (!record) {
-                return fail<arch::CatalogErrors>(arch::ResourceNotFoundError("Singer does not exist: " + query.singer.id));
+                return fail<arch::CatalogErrors>(arch::ResourceNotFoundError(query.singer.display.locale.text("diffsinger.singer_not_found", "Singer does not exist: {0}", query.singer.id)));
             }
 
             auto url = mediaUrl(*m_media, *record, record->demoAudio, query, media::Kind::Audio);
@@ -166,7 +166,7 @@ namespace dssp::arch_diffsinger {
         return catalogueCall<std::optional<arch::GroupMetadata>>([&]() -> arch::CatalogResult<std::optional<arch::GroupMetadata>> {
             const auto found = m_catalog->groups().find(query.id);
             if (found == m_catalog->groups().end()) {
-                return fail<arch::CatalogErrors>(arch::ResourceNotFoundError("Group does not exist: " + query.id));
+                return fail<arch::CatalogErrors>(arch::ResourceNotFoundError(query.display.locale.text("diffsinger.group_not_found", "Group does not exist: {0}", query.id)));
             }
 
             auto info = groupInfo(found->second, query.display);
@@ -181,7 +181,7 @@ namespace dssp::arch_diffsinger {
     arch::CatalogResult<std::vector<arch::SingerInfo>> DiffSinger::groupSingers(const arch::ResourceQuery &query) const {
         return catalogueCall<std::vector<arch::SingerInfo>>([&]() -> arch::CatalogResult<std::vector<arch::SingerInfo>> {
             if (!m_catalog->groups().contains(query.id)) {
-                return fail<arch::CatalogErrors>(arch::ResourceNotFoundError("Group does not exist: " + query.id));
+                return fail<arch::CatalogErrors>(arch::ResourceNotFoundError(query.display.locale.text("diffsinger.group_not_found", "Group does not exist: {0}", query.id)));
             }
 
             std::vector<arch::SingerInfo> result;

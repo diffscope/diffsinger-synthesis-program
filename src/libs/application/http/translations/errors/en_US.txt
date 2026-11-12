@@ -1,0 +1,20 @@
+en_US {
+    accept_task_response { "Accept must allow application/json or application/x-ndjson" }
+    http_payload_processing_failed { "HTTP payload processing failed" }
+    invalid_uri_syntax { "Invalid URI syntax at byte {0}" }
+    json_body_required { "Request body must contain JSON" }
+    json_content_type_required { "Content-Type must be application/json" }
+    nonempty_uri_expected { "Expected a nonempty absolute URI" }
+    request_schema_mismatch { "Request fields do not conform to the API schema" }
+    response_serialization_failed { "Response serialization failed" }
+    title_internal_server_error { "Internal server error" }
+    title_invalid_input { "Invalid input" }
+    title_invalid_request { "Invalid request" }
+    title_malformed_json { "Malformed JSON" }
+    title_not_acceptable { "Not acceptable" }
+    title_operation_cancelled { "Operation canceled" }
+    title_resource_not_found { "Resource not found" }
+    title_unsupported_payload { "Unsupported payload" }
+    unsupported_content_encoding { "Unsupported HTTP Content-Encoding" }
+    uri_scheme_expected { "Expected an absolute URI with a scheme" }
+}

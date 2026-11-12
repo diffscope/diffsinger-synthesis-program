@@ -11,8 +11,7 @@ namespace dssp::http {
 
     struct RequestContext::State {
         std::stop_source source;
-        std::string acceptLanguage;
-        RequestLog logContext;
+        ResponseContext response;
         std::weak_ptr<RequestLifetimeRegistry> registry;
         std::uint64_t registrationId = 0;
 
@@ -28,8 +27,7 @@ namespace dssp::http {
     }
 
     const RequestLog &RequestContext::logContext() const noexcept {
-        static const RequestLog empty;
-        return m_state ? m_state->logContext : empty;
+        return responseContext().log;
     }
 
     std::stop_token RequestContext::cancellation() const noexcept {
@@ -40,16 +38,19 @@ namespace dssp::http {
         return cancellation().stop_requested();
     }
 
-    const std::string &RequestContext::acceptLanguage() const noexcept {
-        static const std::string empty;
-        return m_state ? m_state->acceptLanguage : empty;
+    const ResponseContext &RequestContext::responseContext() const noexcept {
+        static const ResponseContext empty;
+        return m_state ? m_state->response : empty;
+    }
+
+    ResponseContext RequestLifetimeRegistry::responseContext(const drogon::HttpRequest &request) const {
+        return {requestLog(request), localization::Context(m_translations, request.getHeader("accept-language"))};
     }
 
     RequestContext RequestLifetimeRegistry::track(const drogon::HttpRequest &request) {
         RequestContext context;
         context.m_state = std::make_shared<RequestContext::State>();
-        context.m_state->acceptLanguage = request.getHeader("accept-language");
-        context.m_state->logContext = requestLog(request);
+        context.m_state->response = responseContext(request);
         context.m_state->registry = weak_from_this();
 
         bool stop = false;
@@ -101,7 +102,7 @@ namespace dssp::http {
         // Stop callbacks may synchronously release their registration. Never call
         // request_stop or destroy the last request state while holding this mutex.
         for (auto &state : states) {
-            log.stdcTrace("%1 cancelling backend work after client disconnect", state->logContext.description());
+            log.stdcTrace("%1 cancelling backend work after client disconnect", state->response.log.description());
             state->source.request_stop();
         }
     }
@@ -120,7 +121,7 @@ namespace dssp::http {
         }
 
         for (auto &state : states) {
-            log.stdcTrace("%1 cancelling backend work during server shutdown", state->logContext.description());
+            log.stdcTrace("%1 cancelling backend work during server shutdown", state->response.log.description());
             state->source.request_stop();
         }
     }

@@ -31,12 +31,12 @@ namespace dssp::arch_diffsinger {
         }
 
         arch::SynthesisResult<const SingerRecord *> contextSinger(const SingerCatalog &catalog, const arch::SingleSingerContext &context) {
-            auto options = synthesisOptions(context.archExtra);
+            auto options = synthesisOptions(context.archExtra, context.locale);
             if (!options) {
                 return std::unexpected{std::move(options.error())};
             }
 
-            auto source = singerSource(catalog, context.singer);
+            auto source = singerSource(catalog, context.singer, context.locale);
             if (!source) {
                 return std::unexpected{std::move(source.error())};
             }

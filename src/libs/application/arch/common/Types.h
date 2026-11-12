@@ -10,6 +10,7 @@
 
 #include <json/value.h>
 
+#include <dssplocalization/Context.h>
 #include <dsspresource/TaskProgress.h>
 
 namespace dssp::arch {
@@ -24,11 +25,13 @@ namespace dssp::arch {
     struct SingleSingerContext {
         Json::Value archExtra;
         Singer singer;
+        localization::Context locale;
     };
 
     struct MultiSingerContext {
         Json::Value archExtra;
         std::vector<Singer> singers;
+        localization::Context locale;
     };
 
     struct Lyric {
@@ -139,6 +142,7 @@ namespace dssp::arch {
 
     struct CatalogOptions {
         std::string acceptLanguage;
+        localization::Context locale;
     };
 
     struct ResourceQuery {

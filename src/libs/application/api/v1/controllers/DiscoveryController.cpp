@@ -28,7 +28,7 @@ namespace dssp::api_v1 {
         service["service-desc"].append(std::move(description));
         catalog["linkset"].append(std::move(service));
 
-        auto response = http::jsonResponse(catalog, http::requestLog(*request));
+        auto response = http::jsonResponse(catalog, m_lifetime->responseContext(*request));
         if (response->statusCode() == drogon::k200OK) {
             response->setContentTypeString("application/linkset+json; profile=\"https://www.rfc-editor.org/info/rfc9727\"");
         }

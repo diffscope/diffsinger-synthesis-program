@@ -194,7 +194,7 @@ namespace dssp::tests {
     TEST_F(SeparationTest, ColdDiscoveryExportsLocalizedOrderedTracksWithoutLoadingModel) {
         start();
 
-        auto list = m_service->extractors("zh-CN");
+        auto list = m_service->extractors(localization::Context({}, "zh-CN"));
         ASSERT_TRUE(list);
         ASSERT_EQ(list->separation.size(), 1);
         EXPECT_TRUE(list->note.empty());

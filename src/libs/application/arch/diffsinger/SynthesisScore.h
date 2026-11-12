@@ -7,6 +7,7 @@
 #include <dsinfer/Api/Inferences/Common/1/CommonApiL1.h>
 
 #include <dssparchdiffsinger/SynthesisContext.h>
+#include <dssplocalization/Context.h>
 
 namespace dssp::arch_diffsinger {
     namespace Common = ds::Api::Common::L1;
@@ -33,8 +34,8 @@ namespace dssp::arch_diffsinger {
         std::vector<Common::InputSpeakerInfo> speakers;
     };
 
-    arch::SynthesisResult<SynthesisScore> synthesisScore(const SingerRecord &, const arch::Piece<arch::DurationNote> &);
-    arch::SynthesisResult<SynthesisScore> synthesisScore(const SingerRecord &, const arch::Piece<arch::ParameterNote> &);
+    arch::SynthesisResult<SynthesisScore> synthesisScore(const SingerRecord &, const arch::Piece<arch::DurationNote> &, const localization::Context &locale = {});
+    arch::SynthesisResult<SynthesisScore> synthesisScore(const SingerRecord &, const arch::Piece<arch::ParameterNote> &, const localization::Context &locale = {});
     arch::SynthesisResult<void> validateMix(const SynthesisContext &, std::span<const std::vector<double>>, double rate);
     arch::SynthesisResult<StageScore> stageScore(const SynthesisScore &, const SynthesisContext &, std::string_view stage, std::span<const std::vector<double>> mix, double rate);
     arch::SynthesisResult<arch::DurationOutput> durationOutput(const SynthesisScore &, std::span<const double> durations);

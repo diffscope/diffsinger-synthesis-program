@@ -25,12 +25,13 @@ namespace dssp::extraction {
 
         template <class Output>
         struct Request {
-            Request(std::shared_ptr<const ExtractorCatalog> catalog, const ExtractorRecord &record, std::shared_ptr<resource::TaskExecutor> tasks, std::stop_token externalStop, Completion<Output> complete)
-                : catalog(std::move(catalog)), record(record), tasks(std::move(tasks)), complete(std::move(complete)), externalCancel(externalStop, [this] { stop.request_stop(); }) {}
+            Request(std::shared_ptr<const ExtractorCatalog> catalog, const ExtractorRecord &record, std::shared_ptr<resource::TaskExecutor> tasks, std::stop_token externalStop, localization::Context locale, Completion<Output> complete)
+                : catalog(std::move(catalog)), record(record), tasks(std::move(tasks)), locale(std::move(locale)), complete(std::move(complete)), externalCancel(externalStop, [this] { stop.request_stop(); }) {}
 
             std::shared_ptr<const ExtractorCatalog> catalog;
             const ExtractorRecord &record;
             std::shared_ptr<resource::TaskExecutor> tasks;
+            const localization::Context locale;
             Completion<Output> complete;
             resource::TaskProgress progress;
             std::stop_source stop;
@@ -41,15 +42,15 @@ namespace dssp::extraction {
 
             void finish(ExtractionResult<Output> result) {
                 if (done.test_and_set(std::memory_order_acq_rel)) return;
-                if (stop.stop_requested()) result = fail<ExtractionErrors>(CancelledError("Extraction request was cancelled for extractor " + record.id));
+                if (stop.stop_requested()) result = fail<ExtractionErrors>(CancelledError(locale.text("extraction.extraction_request_cancelled_for_extractor", "Extraction request was canceled for extractor {0}", record.id)));
                 complete(std::move(result));
             }
 
             void failExecution(const inference::ExecutionErrors &errors) {
                 if (errors.get_if<inference::CancelledError>()) {
-                    finish(fail<ExtractionErrors>(CancelledError("Extraction was cancelled for extractor " + record.id, errors.asError().clone())));
+                    finish(fail<ExtractionErrors>(CancelledError(locale.text("extraction.extraction_cancelled", "Extraction was canceled for extractor {0}", record.id), errors.asError().clone())));
                 } else {
-                    finish(fail<ExtractionErrors>(OperationError("Extraction inference failed for extractor " + record.id, errors.asError().clone())));
+                    finish(fail<ExtractionErrors>(OperationError(locale.text("extraction.extraction_inference_failed", "Extraction inference failed for extractor {0}", record.id), errors.asError().clone())));
                 }
             }
         };
@@ -58,12 +59,12 @@ namespace dssp::extraction {
         drogon::Task<bool> background(std::shared_ptr<Request<Output>> request) {
             auto ready = co_await request->tasks->resume(request->stop.get_token());
             if (!ready) {
-                if (ready.error().template get_if<resource::TaskCancelledError>()) request->finish(fail<ExtractionErrors>(CancelledError("Extraction background task was cancelled")));
-                else request->finish(fail<ExtractionErrors>(OperationError("Cannot execute extraction background task", ready.error().asError().clone())));
+                if (ready.error().template get_if<resource::TaskCancelledError>()) request->finish(fail<ExtractionErrors>(CancelledError(request->locale.text("extraction.extraction_background_cancelled", "Extraction background task was canceled"))));
+                else request->finish(fail<ExtractionErrors>(OperationError(request->locale.text("extraction.extraction_background_failed", "Cannot execute extraction background task"), ready.error().asError().clone())));
                 co_return false;
             }
             if (request->stop.stop_requested()) {
-                request->finish(fail<ExtractionErrors>(CancelledError("Extraction request was cancelled")));
+                request->finish(fail<ExtractionErrors>(CancelledError(request->locale.text("extraction.extraction_request_cancelled", "Extraction request was canceled"))));
                 co_return false;
             }
 
@@ -72,21 +73,21 @@ namespace dssp::extraction {
 
         template <class Output>
         bool prepare(const std::shared_ptr<Request<Output>> &request, std::string_view url, double threshold) {
-            auto decoded = media::readWaveDataUrl(url, request->stop.get_token());
+            auto decoded = media::readWaveDataUrl(url, request->stop.get_token(), request->locale);
             if (request->stop.stop_requested()) {
-                request->finish(fail<ExtractionErrors>(CancelledError("Audio decoding was cancelled")));
+                request->finish(fail<ExtractionErrors>(CancelledError(request->locale.text("extraction.extraction_audio_decoding_cancelled", "Audio decoding was canceled"))));
                 return false;
             }
             if (!decoded) {
                 if (decoded.error().template get_if<media::InvalidMediaError>()) {
-                    request->finish(fail<ExtractionErrors>(InvalidInputError("Invalid audio for extractor " + request->record.id + ": " + decoded.error().asError().message(), decoded.error().asError().clone())));
+                    request->finish(fail<ExtractionErrors>(InvalidInputError(request->locale.text("extraction.extractor_audio_invalid", "Invalid audio for extractor {0}: {1}", request->record.id, decoded.error().asError().message()), decoded.error().asError().clone())));
                 } else {
-                    request->finish(fail<ExtractionErrors>(OperationError("Cannot decode audio for extractor " + request->record.id, decoded.error().asError().clone())));
+                    request->finish(fail<ExtractionErrors>(OperationError(request->locale.text("extraction.extractor_audio_decode_failed", "Cannot decode audio for extractor {0}", request->record.id), decoded.error().asError().clone())));
                 }
                 return false;
             }
             if (decoded->sampleRate != request->record.sampleRate) {
-                request->finish(fail<ExtractionErrors>(InvalidInputError("Extractor " + request->record.id + " requires " + std::to_string(request->record.sampleRate) + " Hz audio; received " + std::to_string(decoded->sampleRate) + " Hz")));
+                request->finish(fail<ExtractionErrors>(InvalidInputError(request->locale.text("extraction.extractor_sample_rate_mismatch", "Extractor {0} requires {1} Hz audio; received {2} Hz", request->record.id, std::to_string(request->record.sampleRate), std::to_string(decoded->sampleRate)))));
                 return false;
             }
 
@@ -96,11 +97,11 @@ namespace dssp::extraction {
             audio.samples = std::move(decoded->samples);
             auto mono = inference::nativeCall("Otter prepareSamples", [&] { return otter::prepareSamples(audio, request->record.sampleRate, 1, 0); });
             if (!mono) {
-                request->finish(fail<ExtractionErrors>(OperationError("Cannot prepare audio for extractor " + request->record.id, mono.error().clone())));
+                request->finish(fail<ExtractionErrors>(OperationError(request->locale.text("extraction.extractor_audio_prepare_failed", "Cannot prepare audio for extractor {0}", request->record.id), mono.error().clone())));
                 return false;
             }
             if (std::ranges::any_of(*mono, [](float sample) { return !std::isfinite(sample); })) {
-                request->finish(fail<ExtractionErrors>(InvalidInputError("Audio channel averaging produced a nonfinite sample for extractor " + request->record.id)));
+                request->finish(fail<ExtractionErrors>(InvalidInputError(request->locale.text("extraction.extractor_channel_average_nonfinite", "Audio channel averaging produced a nonfinite sample for extractor {0}", request->record.id))));
                 return false;
             }
 
@@ -115,9 +116,9 @@ namespace dssp::extraction {
             auto spans = sliceAudio(request->samples, request->record.sampleRate, request->record.maximumDuration, request->record.outputInterval, threshold, request->stop.get_token());
             if (!spans) {
                 if (spans.error().template get_if<CancelledError>()) {
-                    request->finish(fail<ExtractionErrors>(CancelledError("Audio slicing was cancelled for extractor " + request->record.id, spans.error().asError().clone())));
+                    request->finish(fail<ExtractionErrors>(CancelledError(request->locale.text("extraction.extractor_audio_slicing_cancelled", "Audio slicing was canceled for extractor {0}", request->record.id), spans.error().asError().clone())));
                 } else {
-                    request->finish(fail<ExtractionErrors>(OperationError("Cannot partition audio for extractor " + request->record.id, spans.error().asError().clone())));
+                    request->finish(fail<ExtractionErrors>(OperationError(request->locale.text("extraction.extractor_audio_partition_failed", "Cannot partition audio for extractor {0}", request->record.id), spans.error().asError().clone())));
                 }
                 return false;
             }
@@ -129,7 +130,7 @@ namespace dssp::extraction {
 
         template <class Executive, class InputType, class ResultType, class Output, class Convert>
         void extract(std::shared_ptr<const ExtractorCatalog> catalog, const ExtractorRecord &record, std::shared_ptr<resource::TaskExecutor> tasks, Input input, double threshold, std::stop_token stop, Completion<Output> complete, Convert convert) {
-            const auto request = std::make_shared<Request<Output>>(std::move(catalog), record, std::move(tasks), stop, std::move(complete));
+            const auto request = std::make_shared<Request<Output>>(std::move(catalog), record, std::move(tasks), stop, std::move(input.locale), std::move(complete));
             request->progress = input.progress;
             drogon::async_run([request, input = std::move(input), threshold, convert = std::move(convert)]() mutable -> drogon::Task<> {
                 if (!(co_await background(request))) co_return;
@@ -192,7 +193,7 @@ namespace dssp::extraction {
                 }
 
                 auto output = convert(*request, *result);
-                if (!output) request->finish(fail<ExtractionErrors>(OperationError("Invalid model result from extractor " + request->record.id, output.error().clone())));
+                if (!output) request->finish(fail<ExtractionErrors>(OperationError(request->locale.text("extraction.extractor_model_result_invalid", "Invalid model result from extractor {0}", request->record.id), output.error().clone())));
                 else request->finish(std::move(*output));
             });
         }
@@ -225,21 +226,21 @@ namespace dssp::extraction {
     void Service::tempo(Input input, std::stop_token stop, Completion<TempoOutput> complete) const {
         const auto *record = m_impl->catalog->find(Kind::Tempo, input.extractor);
         if (!record) {
-            complete(fail<ExtractionErrors>(InvalidInputError("Tempo extractor does not exist: " + input.extractor)));
+            complete(fail<ExtractionErrors>(InvalidInputError(input.locale.text("extraction.tempo_extractor_not_found", "Tempo extractor does not exist: {0}", input.extractor))));
             return;
         }
 
         extractTempo(m_impl->catalog, *record, m_impl->tasks, std::move(input), stop, std::move(complete));
     }
 
-    CatalogResult<ExtractorList> Service::extractors(std::string_view language) const { return m_impl->catalog->list(language); }
+    CatalogResult<ExtractorList> Service::extractors(const localization::Context &locale) const { return m_impl->catalog->list(locale); }
 
-    CatalogResult<ExtractorInfo> Service::extractor(Kind kind, std::string_view id, std::string_view language) const { return m_impl->catalog->metadata(kind, id, language); }
+    CatalogResult<ExtractorInfo> Service::extractor(Kind kind, std::string_view id, const localization::Context &locale) const { return m_impl->catalog->metadata(kind, id, locale); }
 
     void Service::note(Input input, std::stop_token stop, Completion<NoteOutput> complete) const {
         const auto *record = m_impl->catalog->find(Kind::Note, input.extractor);
         if (!record) {
-            complete(fail<ExtractionErrors>(InvalidInputError("Note extractor does not exist: " + input.extractor)));
+            complete(fail<ExtractionErrors>(InvalidInputError(input.locale.text("extraction.note_extractor_not_found", "Note extractor does not exist: {0}", input.extractor))));
             return;
         }
 
@@ -261,7 +262,7 @@ namespace dssp::extraction {
     void Service::pitch(Input input, std::stop_token stop, Completion<PitchOutput> complete) const {
         const auto *record = m_impl->catalog->find(Kind::Pitch, input.extractor);
         if (!record) {
-            complete(fail<ExtractionErrors>(InvalidInputError("Pitch extractor does not exist: " + input.extractor)));
+            complete(fail<ExtractionErrors>(InvalidInputError(input.locale.text("extraction.pitch_extractor_not_found", "Pitch extractor does not exist: {0}", input.extractor))));
             return;
         }
 
@@ -281,7 +282,7 @@ namespace dssp::extraction {
     void Service::separation(SeparationInput input, std::stop_token stop, Completion<SeparationOutput> complete) const {
         const auto *record = m_impl->catalog->find(Kind::Separation, input.extractor);
         if (!record) {
-            complete(fail<ExtractionErrors>(InvalidInputError("Separation extractor does not exist: " + input.extractor)));
+            complete(fail<ExtractionErrors>(InvalidInputError(input.locale.text("extraction.separation_extractor_not_found", "Separation extractor does not exist: {0}", input.extractor))));
             return;
         }
 

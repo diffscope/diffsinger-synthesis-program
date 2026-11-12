@@ -6,6 +6,7 @@
 #include <vector>
 
 #include <dssparchdiffsinger/SingerCatalog.h>
+#include <dssplocalization/Context.h>
 
 namespace dssp::arch_diffsinger {
     struct SingerSource {
@@ -25,13 +26,14 @@ namespace dssp::arch_diffsinger {
     };
 
     struct SynthesisContext {
+        localization::Context locale;
         SynthesisOptions options;
         std::vector<SingerSource> sources;
         const GroupRecord *group = nullptr;
     };
 
-    arch::SynthesisResult<SynthesisOptions> synthesisOptions(const Json::Value &);
-    arch::SynthesisResult<SingerSource> singerSource(const SingerCatalog &, const arch::Singer &);
+    arch::SynthesisResult<SynthesisOptions> synthesisOptions(const Json::Value &, const localization::Context &locale = {});
+    arch::SynthesisResult<SingerSource> singerSource(const SingerCatalog &, const arch::Singer &, const localization::Context &locale = {});
     arch::SynthesisResult<SynthesisContext> synthesisContext(const SingerCatalog &, const arch::MultiSingerContext &);
 }
 

@@ -38,7 +38,7 @@ add_executable(dssp_tests
 
 target_compile_features(dssp_tests PRIVATE cxx_std_23)
 target_link_libraries(dssp_tests PRIVATE dssp_api_v1 dssp_runtime GTest::gtest_main)
-target_compile_definitions(dssp_tests PRIVATE DSSP_TEST_OPENAPI_FILE="${DSSP_SOURCE_DIR}/docs/open-api/1.0.json")
+target_compile_definitions(dssp_tests PRIVATE DSSP_TEST_OPENAPI_FILE="${DSSP_SOURCE_DIR}/docs/open-api/1.0.json" DSSP_TEST_RESOURCE_DIR="${DSSP_RESOURCE_BUILD_DIR}")
 
 dssp_sync_include(dssp_tests PREFIX dssptests FORCE NO_INSTALL)
 
@@ -51,6 +51,7 @@ target_link_libraries(dssp_http_access_log_tests PRIVATE dssp_api_v1 GTest::gtes
 add_executable(dssp_http_streaming_tests HttpStreamingTest.cpp)
 target_compile_features(dssp_http_streaming_tests PRIVATE cxx_std_23)
 target_link_libraries(dssp_http_streaming_tests PRIVATE dssp_api_v1 GTest::gtest_main)
+target_compile_definitions(dssp_http_streaming_tests PRIVATE DSSP_TEST_RESOURCE_DIR="${DSSP_RESOURCE_BUILD_DIR}")
 
 # Backend and composition tests are isolated from the HTTP/API target.
 add_executable(dssp_arch_diffsinger_tests DiffSingerTest.cpp SingerDiscoveryTest.cpp LanguagePredictionTest.cpp SynthesisConversionTest.cpp SynthesisTest.cpp SynthesisPipelineTest.cpp ../app/ArchComposition.cpp)

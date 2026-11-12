@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <exception>
 #include <memory>
+#include <utility>
 
 #include <stdcorelib/path.h>
 #include <stdcorelib/str.h>
@@ -102,6 +103,40 @@ namespace dssp::localization {
         }
     }
 
+    std::expected<std::shared_ptr<const Catalog>, LocalizationError> Catalog::load(std::span<const Source> sources, std::string_view fallbackLocale) {
+        try {
+            std::map<std::string, Strings> translations;
+            for (const auto &source : sources) {
+                const auto bundle = load(source.directory, fallbackLocale);
+                if (!bundle) {
+                    return std::unexpected{bundle.error()};
+                }
+
+                const auto &catalog = **bundle;
+                const auto prefix = std::string(source.module) + '.';
+                for (std::size_t i = 0; i < catalog.m_locales.size(); ++i) {
+                    const auto &locale = catalog.m_locales[i];
+                    auto &strings = translations[locale];
+                    for (const auto &[key, value] : catalog.m_translations[i]) {
+                        if (!strings.emplace(prefix + key, value).second) {
+                            return std::unexpected{LocalizationError("Duplicate translation key " + prefix + key + " for locale " + locale)};
+                        }
+                    }
+                }
+            }
+
+            auto result = std::shared_ptr<Catalog>(new Catalog);
+            result->m_fallbackLocale = fallbackLocale;
+            for (auto &[locale, strings] : translations) {
+                result->m_locales.push_back(locale);
+                result->m_translations.push_back(std::move(strings));
+            }
+            return std::shared_ptr<const Catalog>(std::move(result));
+        } catch (const std::exception &error) {
+            return std::unexpected{LocalizationError("Cannot assemble module translations", std::make_shared<const ExternalError>(error.what(), NativeDiagnostic{"localization", "assemble translation catalog", "exception"}))};
+        }
+    }
+
     std::expected<std::string, LocalizationError> Catalog::text(std::string_view key, std::string_view acceptLanguage) const {
         const std::string resourceKey(key);
         // Only bundles containing this key participate in language matching.
@@ -132,5 +167,31 @@ namespace dssp::localization {
 
         // The preferred fallback bundle is optional, too.
         return *strings.front();
+    }
+
+    std::optional<std::size_t> Catalog::select(std::string_view acceptLanguage) const {
+        auto matched = matchLocale(m_locales, acceptLanguage);
+        if (!matched) {
+            log.stdcWarning("Cannot select an error message locale: %1", matched.error().formatChain());
+            return std::nullopt;
+        }
+        return *matched;
+    }
+
+    const std::string *Catalog::pattern(const std::string &key, std::optional<std::size_t> locale) const {
+        if (locale) {
+            const auto &strings = m_translations[*locale];
+            if (const auto it = strings.find(key); it != strings.end()) {
+                return &it->second;
+            }
+        }
+        const auto fallback = std::ranges::find(m_locales, m_fallbackLocale);
+        if (fallback != m_locales.end()) {
+            const auto &strings = m_translations[static_cast<std::size_t>(fallback - m_locales.begin())];
+            if (const auto it = strings.find(key); it != strings.end()) {
+                return &it->second;
+            }
+        }
+        return nullptr;
     }
 }

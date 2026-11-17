@@ -21,7 +21,7 @@ namespace dssp::tests {
     namespace {
         constexpr char gif[] = "GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02\x44\x01\x00\x3b";
 
-        void writeSingerPackage(const TestFiles &files, std::string_view directory, std::string_view version, bool predictiveStages = false, std::string_view defaultLyric = {}) {
+        void writeSingerPackage(const TestFiles &files, std::string_view directory, std::string_view version, bool predictiveStages = false, std::string_view defaultLyric = {}, std::string_view singerConfiguration = R"({"dict":"unused-dictionary.txt"})") {
             const std::filesystem::path root(directory);
             const std::string stageDeclarations = predictiveStages ? R"(,{"id":"duration","path":"duration.json"},{"id":"pitch","path":"pitch.json"},{"id":"variance","path":"variance.json"})" : "";
             files.write(root / "desc.json", "{\"$version\":\"1.0\",\"id\":\"example/singers\",\"version\":\"" + std::string(version) + R"(","runtimeLevel":1,"contributions":{
@@ -56,7 +56,7 @@ namespace dssp::tests {
                         {"role":"singer/pitch","ref":":inference/pitch","options":{}},
                         {"role":"singer/variance","ref":":inference/variance","options":{"predictions":["energy"]}},)" : "";
                 files.write(root / (std::string(id) + ".json"), R"({"interface":"org.openvpi.dsinfer.singer.DiffSinger","variant":"openvpi","level":1,
-                    "name":{"_":"Singer","zh":"歌手"},"avatar":{"_":"pixel.bin","zh":"missing-image.bin"},"demoAudio":"", "configuration":{"dict":"unused-dictionary.txt"},
+                    "name":{"_":"Singer","zh":"歌手"},"avatar":{"_":"pixel.bin","zh":"missing-image.bin"},"demoAudio":"", "configuration":)" + std::string(singerConfiguration) + R"(,
                     "languages":{"eng":")" + languageRole + R"("},"defaultLanguage":"eng","imports":[
                         {"role":"singer/acoustic","ref":":inference/acoustic","options":{}},
                         {"role":"singer/vocoder","ref":":inference/vocoder","options":{}},)" + stageImports + R"(
@@ -190,11 +190,14 @@ namespace dssp::tests {
 
     TEST_F(SingerDiscoveryTest, PredictiveStageDeclarationsExposeDurationAndRangeRetakesWithoutLoadingModels) {
         TestFiles predictive;
-        writeSingerPackage(predictive, "predictive", "1", true);
+        writeSingerPackage(predictive, "predictive", "1", true, {}, R"({"dict":"unused-dictionary.txt","speakers":[
+            {"id":"unavailable","name":"Unavailable"},
+            {"id":"soft","name":{"_":"Soft voice","zh":"柔和声线"}},
+            {"id":"main","name":"Main voice"}]})");
         predictive.write("predictive/acoustic.json", R"({"interface":"org.openvpi.dsinfer.inference.Acoustic","variant":"onnx","level":1,
-            "exports":{"speakers":["main","soft"],"varianceControls":["energy"],"transitionControls":["gender","velocity"]},
+            "exports":{"speakers":["breathy","main","soft"],"varianceControls":["energy"],"transitionControls":["gender","velocity"]},
             "configuration":{"model":"${root}/missing-acoustic.onnx","phonemes":"phonemes.json","parameters":["energy","gender","velocity"],
-                "useSpeakerEmbedding":true,"hiddenSize":1,"speakers":{"main":"voice.emb","soft":"voice.emb"}}})");
+                "useSpeakerEmbedding":true,"hiddenSize":1,"speakers":{"breathy":"voice.emb","main":"voice.emb","soft":"voice.emb"}}})");
         predictive.write("predictive/voice.emb", std::string(sizeof(float), '\0'));
         inference::EnvironmentOptions options;
         options.packageRoots = {predictive.path()};
@@ -232,18 +235,26 @@ namespace dssp::tests {
                 EXPECT_EQ((*pool)->residentCount(), 0U);
             }
             EXPECT_EQ(singer.info.defaultLanguage, "eng");
-            const auto &speakers = singer.info.archSpecificInfo["speakers"];
+            const auto info = arch_diffsinger::singerInfo(singer, {});
+            ASSERT_TRUE(info);
+            const auto &speakers = info->archSpecificInfo["speakers"];
             ASSERT_TRUE(speakers.isArray());
             ASSERT_EQ(speakers.size(), 2U);
+            constexpr std::string_view expectedIds[] = {"soft", "main"};
+            constexpr std::string_view expectedNames[] = {"Soft voice", "Main voice"};
             for (Json::ArrayIndex i = 0; i < speakers.size(); ++i) {
                 ASSERT_TRUE(speakers[i].isObject());
                 EXPECT_EQ(speakers[i].size(), 2U);
                 ASSERT_TRUE(speakers[i]["id"].isString());
                 ASSERT_TRUE(speakers[i]["name"].isString());
-                EXPECT_EQ(speakers[i]["id"].asString(), i == 0 ? "main" : "soft");
-                EXPECT_EQ(speakers[i]["name"], speakers[i]["id"]);
+                EXPECT_EQ(speakers[i]["id"].asString(), expectedIds[i]);
+                EXPECT_EQ(speakers[i]["name"].asString(), expectedNames[i]);
             }
-            EXPECT_EQ(singer.info.defaultExtra["speaker"].asString(), "main");
+            EXPECT_EQ(info->defaultExtra["speaker"].asString(), "soft");
+            const auto localized = arch_diffsinger::singerInfo(singer, {"zh-CN"});
+            ASSERT_TRUE(localized);
+            EXPECT_EQ(localized->archSpecificInfo["speakers"][0]["id"].asString(), "soft");
+            EXPECT_EQ(localized->archSpecificInfo["speakers"][0]["name"].asString(), "柔和声线");
             for (const auto stage : {"duration", "pitch", "variance"}) {
                 EXPECT_FALSE(std::filesystem::exists(singer.package.path() / (std::string("missing-") + stage + "-encoder.onnx")));
                 EXPECT_FALSE(std::filesystem::exists(singer.package.path() / (std::string("missing-") + stage + "-predictor.onnx")));

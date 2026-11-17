@@ -1,8 +1,10 @@
 #include <atomic>
 #include <chrono>
 #include <future>
+#include <map>
 #include <memory>
 #include <stop_token>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -190,13 +192,15 @@ namespace dssp::tests {
         acoustic.embeddedSpeakers = {"ac-main"};
         acoustic.speakerMapping = {{"main", "ac-main"}, {"soft", "ac-broken"}, {"other", "undeclared"}};
         // A stage without embeddings has no speaker condition to intersect.
-        const auto common = arch_diffsinger::commonSpeakers({{"duration", duration}, {"acoustic", acoustic}, {"pitch", pitch}});
-        EXPECT_EQ(common, std::vector<std::string>{"main"});
+        const std::map<std::string, arch_diffsinger::StageRecord> stages{{"duration", duration}, {"acoustic", acoustic}, {"pitch", pitch}};
+        EXPECT_TRUE(arch_diffsinger::supportsSpeaker(stages, "main"));
+        EXPECT_FALSE(arch_diffsinger::supportsSpeaker(stages, "soft"));
+        EXPECT_FALSE(arch_diffsinger::supportsSpeaker(stages, "other"));
         acoustic.speakerMapping.clear();
         duration.speakerMapping = {{"ac-main", "dur-first"}};
-        EXPECT_EQ(arch_diffsinger::commonSpeakers({{"duration", duration}, {"acoustic", acoustic}}), std::vector<std::string>{"ac-main"});
+        EXPECT_TRUE(arch_diffsinger::supportsSpeaker({{"duration", duration}, {"acoustic", acoustic}}, "ac-main"));
         acoustic.embeddedSpeakers.clear();
-        EXPECT_TRUE(arch_diffsinger::commonSpeakers({{"duration", duration}, {"acoustic", acoustic}}).empty());
+        EXPECT_FALSE(arch_diffsinger::supportsSpeaker({{"duration", duration}, {"acoustic", acoustic}}, "ac-main"));
     }
 
 }

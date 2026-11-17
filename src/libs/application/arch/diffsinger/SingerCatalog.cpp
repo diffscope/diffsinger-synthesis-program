@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cmath>
 #include <exception>
-#include <optional>
 #include <string>
 #include <utility>
 
@@ -101,9 +100,12 @@ namespace dssp::arch_diffsinger {
                 return std::unexpected{inference::ResourceError("The DiffSinger pipeline provider is unavailable")};
             }
 
-            const auto *configuration = dynamic_cast<const Ds::DiffSingerConfiguration *>(singer.configuration());
-            if (!configuration) {
+            if (!dynamic_cast<const Ds::DiffSingerConfiguration *>(singer.configuration())) {
                 return std::unexpected{inference::ResourceError("The DiffSinger configuration is unavailable")};
+            }
+            auto metadata = singerMetadata(singer.manifestConfiguration());
+            if (!metadata) {
+                return std::unexpected{std::move(metadata.error())};
             }
 
             auto duration = readStage<Du::DurationSchema, Du::DurationConfiguration, Du::DurationImportOptions>(singer, "singer/duration", false);
@@ -143,13 +145,17 @@ namespace dssp::arch_diffsinger {
             record.background = std::move(*background);
             record.demoAudio = std::move(*demoAudio);
             record.stages = {{"duration", *duration}, {"pitch", *pitch}, {"variance", *variance}, {"acoustic", *acoustic}, {"vocoder", *vocoder}};
-            record.speakers = commonSpeakers(record.stages);
+            for (auto &speaker : metadata->speakers) {
+                if (supportsSpeaker(record.stages, speaker.id)) {
+                    record.speakers.push_back(std::move(speaker));
+                }
+            }
             const bool needsSpeakers = std::ranges::any_of(record.stages, [](const auto &entry) { return entry.second.usesSpeakers; });
             if (needsSpeakers && record.speakers.empty()) {
-                return std::unexpected{inference::ResourceError("No logical speaker is valid across the singer's effective stages")};
+                return std::unexpected{inference::ResourceError("No declared speaker is valid across the singer's effective stages")};
             }
 
-            record.permitsMixing = singerMetadata(*configuration).permitsMixing;
+            record.permitsMixing = metadata->permitsMixing;
 
             GroupRecord groupRecord;
             auto &group = groupRecord.info;
@@ -309,52 +315,29 @@ namespace dssp::arch_diffsinger {
 
             group.id = "g1." + *digest;
             record.info.group = group.id;
-            record.info.archSpecificInfo = Json::Value(Json::objectValue);
-            record.info.archSpecificInfo["speakers"] = Json::Value(Json::arrayValue);
-            for (const auto &speaker : record.speakers) {
-                Json::Value info(Json::objectValue);
-                info["id"] = speaker;
-                info["name"] = speaker;
-                record.info.archSpecificInfo["speakers"].append(std::move(info));
-            }
-
             record.info.defaultExtra = Json::Value(Json::objectValue);
-            record.info.defaultExtra["speaker"] = record.speakers.empty() ? std::string{} : record.speakers.front();
+            record.info.defaultExtra["speaker"] = record.speakers.empty() ? std::string{} : record.speakers.front().id;
             log.stdcDebug("Cached singer %1 in group %2 (%3 languages, %4 speakers, %5 parameters, technical mixing=%6, mixing permission=%7)", record.info.id, group.id, group.languages.size(), record.speakers.size(), group.parameterPipeline.size(), record.technicallyMixable, record.permitsMixing);
             return std::make_pair(std::move(record), std::move(groupRecord));
         }
     }
 
-    std::vector<std::string> commonSpeakers(const std::map<std::string, StageRecord> &stages) {
-        std::optional<std::vector<std::string>> result;
-        for (const auto &[role, stage] : stages) {
+    bool supportsSpeaker(const std::map<std::string, StageRecord> &stages, const std::string &speaker) {
+        return std::ranges::all_of(stages, [&](const auto &entry) {
+            const auto &stage = entry.second;
             if (!stage.usesSpeakers) {
-                continue;
+                return true;
             }
 
-            std::vector<std::string> available;
+            const auto hasEmbedding = [&stage](const std::string &target) {
+                return stage.embeddedSpeakers.contains(target) && std::ranges::find(stage.speakers, target) != stage.speakers.end();
+            };
             if (stage.speakerMapping.empty()) {
-                for (const auto &speaker : stage.speakers) {
-                    if (stage.embeddedSpeakers.contains(speaker) && std::ranges::find(available, speaker) == available.end()) {
-                        available.push_back(speaker);
-                    }
-                }
-            } else {
-                for (const auto &[logical, target] : stage.speakerMapping) {
-                    if (stage.embeddedSpeakers.contains(target) && std::ranges::find(stage.speakers, target) != stage.speakers.end()) {
-                        available.push_back(logical);
-                    }
-                }
+                return hasEmbedding(speaker);
             }
-
-            if (!result) {
-                result = std::move(available);
-            } else {
-                std::erase_if(*result, [&](const auto &speaker) { return std::ranges::find(available, speaker) == available.end(); });
-            }
-        }
-
-        return result.value_or(std::vector<std::string>{});
+            const auto mapped = stage.speakerMapping.find(speaker);
+            return mapped != stage.speakerMapping.end() && hasEmbedding(mapped->second);
+        });
     }
 
     arch::CatalogResult<arch::SingerInfo> singerInfo(const SingerRecord &record, const arch::CatalogOptions &display) {
@@ -365,6 +348,18 @@ namespace dssp::arch_diffsinger {
         }
 
         result.name = std::move(*name);
+        auto &speakers = result.archSpecificInfo["speakers"];
+        speakers = Json::Value(Json::arrayValue);
+        for (const auto &speaker : record.speakers) {
+            auto title = inference::localize(speaker.name, display.acceptLanguage, speaker.id);
+            if (!title) {
+                return fail<arch::CatalogErrors>(arch::OperationError("Cannot localize speaker name for " + speaker.id, title.error().clone()));
+            }
+            Json::Value info(Json::objectValue);
+            info["id"] = speaker.id;
+            info["name"] = std::move(*title);
+            speakers.append(std::move(info));
+        }
         return result;
     }
 

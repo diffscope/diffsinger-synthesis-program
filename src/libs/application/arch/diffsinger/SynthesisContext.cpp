@@ -4,6 +4,8 @@
 #include <cmath>
 #include <utility>
 
+#include <dssparchdiffsinger/SingerMetadata.h>
+
 namespace dssp::arch_diffsinger {
     arch::SynthesisResult<SynthesisOptions> synthesisOptions(const Json::Value &extra, const localization::Context &locale) {
         if (!extra.isObject()) {
@@ -48,7 +50,7 @@ namespace dssp::arch_diffsinger {
             return fail<arch::SynthesisErrors>(arch::InvalidInputError(locale.text("diffsinger.diffsinger_singer_extra_object", "DiffSinger extra must be an object for singer {0}", input.id)));
         }
 
-        auto speaker = singer->speakers.empty() ? std::string{} : singer->speakers.front();
+        auto speaker = singer->speakers.empty() ? std::string{} : singer->speakers.front().id;
         if (input.extra.isMember("speaker")) {
             const auto &value = input.extra["speaker"];
             if (!value.isString()) {
@@ -57,7 +59,7 @@ namespace dssp::arch_diffsinger {
             speaker = value.asString();
         }
 
-        if ((!speaker.empty() && std::ranges::find(singer->speakers, speaker) == singer->speakers.end()) || (speaker.empty() && !singer->speakers.empty())) {
+        if ((!speaker.empty() && std::ranges::find(singer->speakers, speaker, &SpeakerMetadata::id) == singer->speakers.end()) || (speaker.empty() && !singer->speakers.empty())) {
             return fail<arch::SynthesisErrors>(arch::InvalidInputError(locale.text("diffsinger.diffsinger_speaker_unavailable", "Singer {0} has no selectable logical speaker '{1}'", input.id, speaker)));
         }
 

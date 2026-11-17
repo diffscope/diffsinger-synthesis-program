@@ -1,17 +1,28 @@
 #ifndef DSSP_ARCHDIFFSINGER_SINGERMETADATA_H
 #define DSSP_ARCHDIFFSINGER_SINGERMETADATA_H
 
-namespace ds::Api::DiffSinger::L1 {
-    class DiffSingerConfiguration;
-}
+#include <expected>
+#include <string>
+#include <vector>
+
+#include <synthrt/Support/DisplayText.h>
+#include <synthrt/Support/JSON.h>
+
+#include <dsspinference/InferenceError.h>
 
 namespace dssp::arch_diffsinger {
 
+    struct SpeakerMetadata {
+        std::string id;
+        srt::DisplayText name;
+    };
+
     struct SingerMetadata {
+        std::vector<SpeakerMetadata> speakers;
         bool permitsMixing = true;
     };
 
-    SingerMetadata singerMetadata(const ds::Api::DiffSinger::L1::DiffSingerConfiguration &);
+    std::expected<SingerMetadata, inference::ResourceError> singerMetadata(const srt::JsonValue &configuration);
 }
 
 #endif // DSSP_ARCHDIFFSINGER_SINGERMETADATA_H

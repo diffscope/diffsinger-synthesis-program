@@ -2092,10 +2092,10 @@
             "description": "This singer's preferred singing language handle. A nonempty value must be a key in its group's languages map. It may differ between singers in the same group. An empty string means no default language is declared or the group has no available languages; clients must not infer a preference from map order."
           },
           "archSpecificInfo": {
-            "description": "Architecture-specific properties of this individual singer, such as selectable voices. DiffSinger returns a speakers array of objects with id and name string fields. The id identifies a selectable logical speaker and is accepted by extra.speaker. The name contains the display name and currently equals the id. The array is empty if no speaker selection is required. Shared duration and language conversion capabilities belong to GroupMetadata and GroupLanguageInfo, not this payload."
+            "description": "Architecture-specific properties of this individual singer, such as selectable voices. DiffSinger returns a speakers array of objects with id and name string fields. The array contains the speakers declared in the singer's configuration.speakers that are supported by every stage that uses speaker embeddings, in declaration order. The id identifies a selectable logical speaker and is accepted by extra.speaker. The name is selected from the declaration using Accept-Language and defaults to the id if no display name is available. Shared duration and language conversion capabilities belong to GroupMetadata and GroupLanguageInfo, not this payload."
           },
           "defaultExtra": {
-            "description": "Default architecture-specific parameters for this singer's extra payload, such as a voice selection. Request-wide synthesis parameters are supplied separately in context.archExtra and are not part of these defaults."
+            "description": "Default architecture-specific parameters for this singer's extra payload, such as a voice selection. DiffSinger sets speaker to the first selectable speaker id, or to an empty string if the list is empty. Request-wide synthesis parameters are supplied separately in context.archExtra and are not part of these defaults."
           }
         },
         "description": "An installed singer and its individual metadata. Shared language and pipeline capabilities are obtained from the group identified by arch and group.",
@@ -2110,11 +2110,11 @@
               "speakers": [
                 {
                   "id": "main",
-                  "name": "main"
+                  "name": "Main voice"
                 },
                 {
                   "id": "soft",
-                  "name": "soft"
+                  "name": "Soft voice"
                 }
               ]
             },

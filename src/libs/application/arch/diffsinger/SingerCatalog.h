@@ -12,6 +12,7 @@
 
 #include <dssparch/Errors.h>
 #include <dssparch/Types.h>
+#include <dssparchdiffsinger/SingerMetadata.h>
 #include <dsspinference/Environment.h>
 #include <dsspinference/LanguageRoute.h>
 
@@ -43,7 +44,7 @@ namespace dssp::arch_diffsinger {
         std::map<std::string, StageRecord> stages;
         std::map<std::string, inference::LanguageRoute> languages;
         std::vector<std::string> reservedPhonemes;
-        std::vector<std::string> speakers;
+        std::vector<SpeakerMetadata> speakers;
         // Keep the model's exported order after applying the singer's import subset.
         std::vector<std::string> variancePredictions;
         bool technicallyMixable = false;
@@ -68,7 +69,7 @@ namespace dssp::arch_diffsinger {
         std::map<std::string, GroupRecord> m_groups;
     };
 
-    std::vector<std::string> commonSpeakers(const std::map<std::string, StageRecord> &);
+    bool supportsSpeaker(const std::map<std::string, StageRecord> &stages, const std::string &speaker);
     arch::CatalogResult<arch::SingerInfo> singerInfo(const SingerRecord &, const arch::CatalogOptions &);
     arch::CatalogResult<arch::GroupMetadata> groupInfo(const GroupRecord &, const arch::CatalogOptions &);
 }

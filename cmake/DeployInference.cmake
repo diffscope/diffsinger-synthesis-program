@@ -19,17 +19,19 @@ function(dssp_deploy_inference_plugins target)
     endif()
 
     # Categories and driver bundles are loaded at runtime, so linking the four
-    # libraries alone cannot deploy them. Preserve their upstream directory shape.
-    foreach(_library IN ITEMS dsinfer wolf otter)
+    # libraries alone cannot deploy them. Each package installs its plugins under
+    # lib/<package>/plugins, while the host scans the flat <plugins>/<family> layout.
+    foreach(_package IN ITEMS synthrt-dsinfer synthrt-wolf synthrt-otter)
+        string(REGEX REPLACE "^synthrt-" "" _family "${_package}")
         qm_add_copy_command(${target}
-            SOURCES "${_library_source}/plugins/${_library}/"
-            DESTINATION "${_plugin_root}/${_library}"
+            SOURCES "${_library_source}/${_package}/plugins/"
+            DESTINATION "${_plugin_root}/${_family}"
             SKIP_INSTALL
         )
 
         if(DSSP_INSTALL)
-            install(DIRECTORY "${_library_source}/plugins/${_library}/"
-                DESTINATION "${DSSP_INSTALL_PLUGINS_DIR}/${_library}")
+            install(DIRECTORY "${_library_source}/${_package}/plugins/"
+                DESTINATION "${DSSP_INSTALL_PLUGINS_DIR}/${_family}")
         endif()
     endforeach()
 

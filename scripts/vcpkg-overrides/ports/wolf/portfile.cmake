@@ -1,10 +1,10 @@
-# wolf, pinned to the spec2.4-uptake branch tip selected for DSSP.
+# wolf, pinned to the synthrt main-line tip selected for DSSP.
 # A fetch by commit needs no archive hash.
 vcpkg_from_git(
     OUT_SOURCE_PATH SOURCE_PATH
     URL https://github.com/diffscope/wolf.git
-    REF a6f94af8d7de0b588b8e3bb5d69ed6025e395121
-    HEAD_REF spec2.4-uptake
+    REF 6ef9934cc3385e1beaf6e2c9ca1b4efef072c01e
+    HEAD_REF main
 )
 
 vcpkg_cmake_configure(

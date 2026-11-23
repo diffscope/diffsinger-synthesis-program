@@ -1,5 +1,5 @@
 find_package(synthrt CONFIG REQUIRED)
-find_package(dsinfer CONFIG REQUIRED)
+find_package(synthrt-dsinfer CONFIG REQUIRED)
 find_package(stdcorelib CONFIG REQUIRED)
 
 include(GenerateExportHeader)
@@ -27,7 +27,7 @@ set_target_properties(srtbeatinfer_dsp PROPERTIES POSITION_INDEPENDENT_CODE ON C
 
 add_library(srtbeatinferbeatthis MODULE plugins/beat-this/main.cpp)
 target_compile_features(srtbeatinferbeatthis PRIVATE cxx_std_23)
-target_link_libraries(srtbeatinferbeatthis PRIVATE srtbeatinfer_dsp dsinfer::dsinfer stdcorelib::stdcorelib)
+target_link_libraries(srtbeatinferbeatthis PRIVATE srtbeatinfer_dsp synthrt::dsinfer stdcorelib::stdcorelib)
 set_target_properties(srtbeatinferbeatthis PROPERTIES
     PREFIX "" DEBUG_POSTFIX ""
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/plugins/$<CONFIG>/beat-this"

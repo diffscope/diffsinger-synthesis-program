@@ -1,7 +1,8 @@
 {
   "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
   "name": "synthrt",
-  "version-string": "spec2.4-uptake",
+  "version-string": "0.2.0.0",
+  "port-version": 1,
   "description": [
     "SVS Synthesis Runtime Library, main line.",
     "Overrides the shared overlay's synthrt port, which pins the refactor line."
@@ -27,13 +28,13 @@
   ],
   "features": {
     "onnx": {
-      "description": "Build dsinfer and its ONNX Runtime driver (DirectML on Windows, CPU elsewhere)",
+      "description": "Provide ONNX Runtime for the dsinfer ONNX driver (DirectML on Windows, CPU elsewhere)",
       "dependencies": [
         "onnxruntime-builds"
       ]
     },
     "cuda12": {
-      "description": "Bring in the CUDA 12.x flavour of ONNX Runtime for dsinfer's driver",
+      "description": "Bring in the CUDA 12.x flavour of ONNX Runtime for the dsinfer ONNX driver",
       "dependencies": [
         {
           "name": "synthrt",

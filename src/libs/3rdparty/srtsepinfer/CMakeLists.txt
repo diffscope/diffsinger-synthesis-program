@@ -1,6 +1,6 @@
 # This library and its interpreter are project targets, not vcpkg payloads.
 find_package(synthrt CONFIG REQUIRED)
-find_package(dsinfer CONFIG REQUIRED)
+find_package(synthrt-dsinfer CONFIG REQUIRED)
 find_package(stdcorelib CONFIG REQUIRED)
 find_package(pffft CONFIG REQUIRED)
 
@@ -31,7 +31,7 @@ set_target_properties(srtsepinfer_dsp PROPERTIES POSITION_INDEPENDENT_CODE ON CX
 
 add_library(srtsepinferdemucs MODULE plugins/demucs/main.cpp)
 target_compile_features(srtsepinferdemucs PRIVATE cxx_std_23)
-target_link_libraries(srtsepinferdemucs PRIVATE srtsepinfer_dsp dsinfer::dsinfer stdcorelib::stdcorelib)
+target_link_libraries(srtsepinferdemucs PRIVATE srtsepinfer_dsp synthrt::dsinfer stdcorelib::stdcorelib)
 
 # Build outside the deployed tree so staging has a genuine target dependency and
 # can restore deleted metadata without relying on a vcpkg directory glob.

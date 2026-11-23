@@ -1,10 +1,10 @@
-# otter, pinned to the spec2.4-uptake branch tip selected for DSSP.
+# otter, pinned to the synthrt main-line tip selected for DSSP.
 # A fetch by commit needs no archive hash.
 vcpkg_from_git(
     OUT_SOURCE_PATH SOURCE_PATH
     URL https://github.com/diffscope/otter.git
-    REF 6c9b8a0b8f59f2f7dd77f8cc6941f803658275bd
-    HEAD_REF spec2.4-uptake
+    REF 192c3a307df0dd4fa84258eb71c3498d015c60c3
+    HEAD_REF main
 )
 
 vcpkg_cmake_configure(

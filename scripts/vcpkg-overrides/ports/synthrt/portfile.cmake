@@ -1,68 +1,63 @@
 # synthrt main line, overriding the shared overlay's refactor-line port.
-# Keep the fixed commit aligned with ds-editor-lite PR #192 and the spec2.4-uptake versions of wolf and otter.
+# Keep the fixed commit aligned with the wolf and otter pins of this repository.
 # A fetch by commit needs no archive hash.
 vcpkg_from_git(
     OUT_SOURCE_PATH SOURCE_PATH
     URL https://github.com/diffscope/synthrt.git
-    REF 3d82829ad8aed396e232765a40663d3b764c9907
-    HEAD_REF spec2.4-uptake
+    REF f6476669500df09e44c0f4615880b10d9b90914b
+    HEAD_REF main
 )
 
-vcpkg_check_features(OUT_FEATURE_OPTIONS FEATURE_OPTIONS
-    FEATURES
-        onnx WITH_ONNX
-        cuda12 WITH_CUDA
-)
+# dsinfer is part of synthrt main and is always built. The onnx feature adds ONNX Runtime, which
+# the ONNX driver needs. No ONNX Runtime files are staged: synthrt locates the onnxruntime-builds
+# package itself, and the dependency of the feature has already installed that package into the
+# same tree, so its headers are on the find_package search path.
+set(_synthrt_cuda OFF)
+if("cuda12" IN_LIST FEATURES)
+    set(_synthrt_cuda ON)
+endif()
 
-# dsinfer is off unless asked for. The inference and singer categories live in synthrt itself, and
-# the onnx feature turns dsinfer and its ONNX driver on for synthesis and analysis.
-#
-# Nothing is staged for ONNX Runtime. synthrt finds the onnxruntime-builds package itself, and the
-# feature's dependency has already installed it into this same tree, so the headers are where
-# find_package looks.
-set(_synthrt_dsinfer OFF)
-
-if(WITH_ONNX)
-    set(_synthrt_dsinfer ON)
+# DirectML is a Windows API. On other platforms dsinfer runs the CPU provider, so the option is
+# enabled only on Windows instead of being passed to dsinfer to ignore.
+set(_synthrt_directml OFF)
+if(VCPKG_TARGET_IS_WINDOWS)
+    set(_synthrt_directml ON)
 endif()
 
 vcpkg_cmake_configure(
     SOURCE_PATH "${SOURCE_PATH}"
     OPTIONS
         -DSYNTHRT_BUILD_TESTS:BOOL=OFF
-        -DSYNTHRT_BUILD_DSINFER:BOOL=${_synthrt_dsinfer}
-        # The CUDA execution provider is compiled in only with the cuda12 feature, which also brings
-        # the CUDA flavour of the ONNX Runtime payload. Without it Windows runs the DirectML
-        # provider and every other platform the CPU one.
-        -DDSINFER_ENABLE_CUDA:BOOL=${WITH_CUDA}
-        -DDSINFER_ENABLE_DIRECTML:BOOL=ON
+        -DSYNTHRT_BUILD_DSINFER:BOOL=ON
+        # The CUDA execution provider is compiled in only with the cuda12 feature, which also
+        # brings the CUDA flavour of the ONNX Runtime payload.
+        -DDSINFER_ENABLE_CUDA:BOOL=${_synthrt_cuda}
+        -DDSINFER_ENABLE_DIRECTML:BOOL=${_synthrt_directml}
 )
 
 vcpkg_cmake_install()
 
-# synthrt installs two CMake packages side by side under lib/cmake: synthrt itself and, with the
-# onnx feature, dsinfer. The fixup for one must not delete the parent directory, or the other
-# package is silently lost and consumers are left locating the dsinfer library by hand.
+# synthrt installs two CMake packages side by side under lib/cmake: synthrt itself and
+# synthrt-dsinfer. The fixup of one package must not delete the parent directory. Otherwise the
+# other package is silently lost, and consumers must locate the dsinfer library manually.
 vcpkg_cmake_config_fixup(
     PACKAGE_NAME synthrt
     CONFIG_PATH lib/cmake/synthrt
     DO_NOT_DELETE_PARENT_CONFIG_PATH
 )
-if(WITH_ONNX)
-    vcpkg_cmake_config_fixup(
-        PACKAGE_NAME dsinfer
-        CONFIG_PATH lib/cmake/dsinfer
-        DO_NOT_DELETE_PARENT_CONFIG_PATH
-    )
-endif()
+vcpkg_cmake_config_fixup(
+    PACKAGE_NAME synthrt-dsinfer
+    CONFIG_PATH lib/cmake/synthrt-dsinfer
+    DO_NOT_DELETE_PARENT_CONFIG_PATH
+)
 file(REMOVE_RECURSE
     "${CURRENT_PACKAGES_DIR}/lib/cmake"
     "${CURRENT_PACKAGES_DIR}/debug/lib/cmake"
 )
 
-# The ONNX driver is not a link target. It is reached the way every driver is: as a plugin found
-# on a search path at run time, under lib/plugins/dsinfer/inferencedrivers. The plugins install
-# their DLLs there on Windows, which vcpkg's layout check would otherwise refuse.
+# The ONNX driver is not a link target. Like every driver, it is loaded at run time as a plugin
+# found on a search path, under lib/synthrt-dsinfer/plugins/inferencedrivers. On Windows the
+# plugins install their DLLs there, which the vcpkg layout check would otherwise reject.
 set(VCPKG_POLICY_ALLOW_DLLS_IN_LIB enabled)
 
 file(REMOVE_RECURSE

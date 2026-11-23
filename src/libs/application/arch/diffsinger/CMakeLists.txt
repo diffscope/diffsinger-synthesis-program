@@ -1,11 +1,11 @@
-find_package(dsinfer CONFIG REQUIRED)
+find_package(synthrt-dsinfer CONFIG REQUIRED)
 
 file(GLOB _src CONFIGURE_DEPENDS *.cpp *.h)
 add_library(dssp_arch_diffsinger STATIC ${_src})
 
 target_compile_features(dssp_arch_diffsinger PUBLIC cxx_std_23)
 target_include_directories(dssp_arch_diffsinger PUBLIC "$<BUILD_INTERFACE:${DSSP_BUILD_INCLUDE_DIR}>")
-target_link_libraries(dssp_arch_diffsinger PUBLIC dssp_arch dssp_inference dssp_media dssp_localization dsinfer::dsinfer)
+target_link_libraries(dssp_arch_diffsinger PUBLIC dssp_arch dssp_inference dssp_media dssp_localization synthrt::dsinfer)
 target_link_libraries(dssp_arch_diffsinger PRIVATE stdcorelib::stdcorelib)
 target_compile_definitions(dssp_arch_diffsinger PRIVATE DSSP_PROGRAM_VERSION="${DSSP_VERSION}")
 

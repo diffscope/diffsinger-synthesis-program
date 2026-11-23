@@ -13,8 +13,8 @@
 
 #include <dssparchdiffsinger/DiffSinger.h>
 #include <dssparchdiffsinger/Factory.h>
-#include <dsspruntime/InferenceCaches.h>
 #include <dsspcodecutil/codecutil.h>
+#include <dsspruntime/InferenceCaches.h>
 #include <dssptests/TestFiles.h>
 
 namespace dssp::tests {
@@ -25,7 +25,8 @@ namespace dssp::tests {
             const std::filesystem::path root(directory);
             const std::string stageDeclarations = predictiveStages ? R"(,{"id":"duration","path":"duration.json"},{"id":"pitch","path":"pitch.json"},{"id":"variance","path":"variance.json"})" : "";
             files.write(root / "desc.json", "{\"$version\":\"1.0\",\"id\":\"example/singers\",\"version\":\"" + std::string(version) + R"(","runtimeLevel":1,"contributions":{
-                "inference":[{"id":"acoustic","path":"acoustic.json"},{"id":"vocoder","path":"vocoder.json"},{"id":"g2p","path":"g2p.json"})" + stageDeclarations + R"(],
+                "inference":[{"id":"acoustic","path":"acoustic.json"},{"id":"vocoder","path":"vocoder.json"},{"id":"g2p","path":"g2p.json"})" +
+                                                stageDeclarations + R"(],
                 "linguist":[{"id":"eng","path":"eng.json"}],
                 "singer":[{"id":"first","path":"first.json"},{"id":"second","path":"second.json"}]}})");
             files.write(root / "acoustic.json", R"({"interface":"org.openvpi.dsinfer.inference.Acoustic","variant":"onnx","level":1,
@@ -48,18 +49,23 @@ namespace dssp::tests {
             const std::string lyricDeclaration = defaultLyric.empty() ? "" : ",\"defaultLyric\":\"" + std::string(defaultLyric) + '"';
             files.write(root / "eng.json", R"({"interface":"org.openvpi.wolf.linguist.WolfLinguist","variant":"wolf","level":1,
                 "language":"eng","scheme":"test","name":{"_":"English","ja":"英語"},
-                "exports":{"phonemes":["a"]},"configuration":{},"imports":[{"role":"linguist/g2p","ref":":inference/g2p"}])" + lyricDeclaration + '}');
+                "exports":{"phonemes":["a"]},"configuration":{},"imports":[{"role":"linguist/g2p","ref":":inference/g2p"}])" +
+                                               lyricDeclaration + '}');
             for (const auto id : {"first", "second"}) {
                 const std::string languageRole = std::string_view(id) == "first" ? "language/eng" : "custom/english";
                 const std::string stageImports = predictiveStages ? R"(
                         {"role":"singer/duration","ref":":inference/duration","options":{}},
                         {"role":"singer/pitch","ref":":inference/pitch","options":{}},
-                        {"role":"singer/variance","ref":":inference/variance","options":{"predictions":["energy"]}},)" : "";
+                        {"role":"singer/variance","ref":":inference/variance","options":{"predictions":["energy"]}},)"
+                                                                  : "";
                 files.write(root / (std::string(id) + ".json"), R"({"interface":"org.openvpi.dsinfer.singer.DiffSinger","variant":"openvpi","level":1,
-                    "name":{"_":"Singer","zh":"歌手"},"avatar":{"_":"pixel.bin","zh":"missing-image.bin"},"demoAudio":"", "configuration":)" + std::string(singerConfiguration) + R"(,
-                    "languages":{"eng":")" + languageRole + R"("},"defaultLanguage":"eng","imports":[
+                    "name":{"_":"Singer","zh":"歌手"},"avatar":{"_":"pixel.bin","zh":"missing-image.bin"},"demoAudio":"", "configuration":)" +
+                                                                    std::string(singerConfiguration) + R"(,
+                    "exports":{"languages":{"eng":")" + languageRole +
+                                                                    R"("},"defaultLanguage":"eng"},"imports":[
                         {"role":"singer/acoustic","ref":":inference/acoustic","options":{}},
-                        {"role":"singer/vocoder","ref":":inference/vocoder","options":{}},)" + stageImports + R"(
+                        {"role":"singer/vocoder","ref":":inference/vocoder","options":{}},)" +
+                                                                    stageImports + R"(
                         {"role":")" + languageRole + R"(","ref":":linguist/eng","options":{}}]})");
             }
             files.write(root / "pixel.bin", std::string_view(gif, sizeof(gif) - 1));
@@ -130,7 +136,8 @@ namespace dssp::tests {
             ASSERT_TRUE(record->languages.contains("eng"));
             EXPECT_EQ(record->languages.at("eng").depth, inference::LanguageDepth::Pronunciation);
             for (const auto &group : runtime::InferenceCacheGroups) {
-                if (!group.id.starts_with("diffsinger-")) continue;
+                if (!group.id.starts_with("diffsinger-"))
+                    continue;
                 const auto pool = m_environment->inferences(group.id);
                 ASSERT_TRUE(pool);
                 EXPECT_EQ((*pool)->residentCount(), 0U);
@@ -229,7 +236,8 @@ namespace dssp::tests {
             SCOPED_TRACE(id);
             ASSERT_TRUE(singer.languages.contains("eng"));
             for (const auto &group : runtime::InferenceCacheGroups) {
-                if (!group.id.starts_with("diffsinger-")) continue;
+                if (!group.id.starts_with("diffsinger-"))
+                    continue;
                 const auto pool = (*host)->inferences(group.id);
                 ASSERT_TRUE(pool);
                 EXPECT_EQ((*pool)->residentCount(), 0U);
@@ -294,7 +302,8 @@ namespace dssp::tests {
                 "exports":{"varianceControls":["energy"],"transitionControls":["gender","velocity"]},
                 "configuration":{"model":"${root}/missing-acoustic.onnx","phonemes":"acoustic-phonemes.json","parameters":["energy","gender","velocity"]}})");
             files.write("coverage/eng.json", R"({"interface":"org.openvpi.wolf.linguist.WolfLinguist","variant":"wolf","level":1,
-                "language":"eng","scheme":"test","exports":)" + std::string(testCase.exports) + R"(,
+                "language":"eng","scheme":"test","exports":)" +
+                                                 std::string(testCase.exports) + R"(,
                 "configuration":{},"imports":[{"role":"linguist/g2p","ref":":inference/g2p"}]})");
             inference::EnvironmentOptions options;
             options.packageRoots = {files.path()};
@@ -334,7 +343,7 @@ namespace dssp::tests {
         ASSERT_TRUE(background);
         EXPECT_TRUE(background->empty());
         const auto demo = m_implementation->demoAudio(query);
-    ASSERT_TRUE(demo) << (demo ? "" : demo.error().asError().formatChain());
+        ASSERT_TRUE(demo) << (demo ? "" : demo.error().asError().formatChain());
         EXPECT_TRUE(demo->empty());
         query.media.acceptableFormats = {"image/png"};
         const auto format = m_implementation->avatar(query);

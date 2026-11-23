@@ -7,8 +7,8 @@
 #include <synthrt/Core/SynthUnit.h>
 
 #include <dsspinference/Display.h>
-#include <dsspinference/ResourceIdentity.h>
 #include <dsspinference/ParallelismPolicy.h>
+#include <dsspinference/ResourceIdentity.h>
 
 namespace dssp::extraction {
     namespace {
@@ -21,7 +21,7 @@ namespace dssp::extraction {
         template <class Schema, class Create>
         std::expected<ExtractorRecord, inference::ResourceError> read(srt::InferenceSpec &spec, Kind kind, inference::InferencePool &pool, Create create) {
             const auto *schema = dynamic_cast<const Schema *>(spec.exports());
-            if (!schema || !spec.configuration() || schema->interfaceId() != spec.interfaceId() || schema->level() != spec.level() || schema->variant() != spec.variant() || schema->sampleRate <= 0 || schema->channelCount != 1 || !std::isfinite(schema->maxSegmentDuration) || schema->maxSegmentDuration < 0) {
+            if (!schema || !spec.configuration() || schema->contract() != spec.triplet().contract() || schema->sampleRate <= 0 || schema->channelCount != 1 || !std::isfinite(schema->maxSegmentDuration) || schema->maxSegmentDuration < 0) {
                 return std::unexpected{inference::ResourceError("Analyzer has an unsupported typed contract, format or duration limit")};
             }
 
@@ -48,19 +48,22 @@ namespace dssp::extraction {
             definition.parallelSafe = inference::permitsParallelExecution(spec);
             definition.create = [&spec, create]() -> std::expected<std::unique_ptr<srt::InferenceExecutive>, inference::ExecutionError> {
                 auto created = inference::nativeCall("Create extraction executive", [&] { return create(spec); });
-                if (!created) return std::unexpected{std::move(created.error())};
+                if (!created)
+                    return std::unexpected{std::move(created.error())};
                 return std::move(*created);
             };
 
             auto resource = pool.bind(std::move(definition));
-            if (!resource) return std::unexpected{inference::ResourceError("Cannot bind analyzer resource", resource.error().clone())};
+            if (!resource)
+                return std::unexpected{inference::ResourceError("Cannot bind analyzer resource", resource.error().clone())};
             record.resource = std::move(*resource);
             return record;
         }
 
         std::expected<ExtractorRecord, inference::ResourceError> readSeparation(srt::InferenceSpec &spec, inference::InferencePool &pool) {
             const auto *schema = dynamic_cast<const Sep::SeparationSchema *>(spec.exports());
-            if (!schema || !spec.configuration() || schema->interfaceId() != spec.interfaceId() || schema->level() != spec.level() || schema->variant() != spec.variant() || schema->sampleRate <= 0 || schema->channelCount <= 0 || schema->tracks.empty() || !std::isfinite(schema->maxSegmentDuration) || schema->maxSegmentDuration != 0) return std::unexpected{inference::ResourceError("Separator has an unsupported typed audio or duration contract")};
+            if (!schema || !spec.configuration() || schema->contract() != spec.triplet().contract() || schema->sampleRate <= 0 || schema->channelCount <= 0 || schema->tracks.empty() || !std::isfinite(schema->maxSegmentDuration) || schema->maxSegmentDuration != 0)
+                return std::unexpected{inference::ResourceError("Separator has an unsupported typed audio or duration contract")};
             ExtractorRecord record;
             record.kind = Kind::Separation;
             record.id = inference::resourceReference(spec);
@@ -78,23 +81,27 @@ namespace dssp::extraction {
             definition.parallelSafe = inference::permitsParallelExecution(spec);
             definition.create = [&spec]() -> std::expected<std::unique_ptr<srt::InferenceExecutive>, inference::ExecutionError> {
                 auto created = inference::nativeCall("srtsepinfer createSeparator", [&] { return Sep::createSeparator(spec); });
-                if (!created) return std::unexpected{std::move(created.error())};
+                if (!created)
+                    return std::unexpected{std::move(created.error())};
                 return std::move(*created);
             };
 
             auto resource = pool.bind(std::move(definition));
-            if (!resource) return std::unexpected{inference::ResourceError("Cannot bind separator resource", resource.error().clone())};
+            if (!resource)
+                return std::unexpected{inference::ResourceError("Cannot bind separator resource", resource.error().clone())};
             record.resource = std::move(*resource);
             return record;
         }
 
         CatalogResult<ExtractorInfo> present(const ExtractorRecord &record, const localization::Context &locale) {
             auto name = inference::localize(record.name, locale.acceptLanguage(), record.id);
-            if (!name) return fail<CatalogErrors>(OperationError(locale.text("extraction.extractor_localization_failed", "Cannot localize extractor {0}", record.id), name.error().clone()));
+            if (!name)
+                return fail<CatalogErrors>(OperationError(locale.text("extraction.extractor_localization_failed", "Cannot localize extractor {0}", record.id), name.error().clone()));
             ExtractorInfo result{record.id, std::move(*name), static_cast<std::uint32_t>(record.sampleRate)};
             for (const auto &track : record.tracks) {
                 auto description = inference::localize(track.description, locale.acceptLanguage(), track.id);
-                if (!description) return fail<CatalogErrors>(OperationError(locale.text("extraction.separation_track_localization_failed", "Cannot localize separation track {0}", track.id), description.error().clone()));
+                if (!description)
+                    return fail<CatalogErrors>(OperationError(locale.text("extraction.separation_track_localization_failed", "Cannot localize separation track {0}", track.id), description.error().clone()));
                 result.tracks.push_back({track.id, std::move(*description)});
             }
 
@@ -103,30 +110,37 @@ namespace dssp::extraction {
     }
 
     std::expected<std::shared_ptr<const ExtractorCatalog>, inference::InitializationError> ExtractorCatalog::discover(std::shared_ptr<inference::Environment> environment) {
-        if (!environment) return std::unexpected{inference::InitializationError("Extraction requires an inference environment")};
+        if (!environment)
+            return std::unexpected{inference::InitializationError("Extraction requires an inference environment")};
         auto catalog = std::shared_ptr<ExtractorCatalog>(new ExtractorCatalog(std::move(environment)));
         auto notePool = catalog->m_environment->inferences("extraction-note");
         auto pitchPool = catalog->m_environment->inferences("extraction-pitch");
         auto separationPool = catalog->m_environment->inferences("extraction-separation");
         auto tempoPool = catalog->m_environment->inferences("extraction-tempo");
-        if (!notePool) return std::unexpected{std::move(notePool.error())};
-        if (!pitchPool) return std::unexpected{std::move(pitchPool.error())};
-        if (!separationPool) return std::unexpected{std::move(separationPool.error())};
-        if (!tempoPool) return std::unexpected{std::move(tempoPool.error())};
+        if (!notePool)
+            return std::unexpected{std::move(notePool.error())};
+        if (!pitchPool)
+            return std::unexpected{std::move(pitchPool.error())};
+        if (!separationPool)
+            return std::unexpected{std::move(separationPool.error())};
+        if (!tempoPool)
+            return std::unexpected{std::move(tempoPool.error())};
         try {
             auto *category = dynamic_cast<srt::InferenceCategory *>(catalog->m_environment->unit().category(srt::InferenceCategory::NAME));
-            if (!category) return std::unexpected{inference::InitializationError("Synthrt inference category is unavailable")};
+            if (!category)
+                return std::unexpected{inference::InitializationError("Synthrt inference category is unavailable")};
             std::size_t notes = 0, pitches = 0, tempos = 0, separations = 0, rejected = 0;
             for (auto *spec : category->inferences()) {
-                if (spec->variant() == "stub" || spec->level() != 1) continue;
+                if (spec->triplet().variant() == "stub" || spec->triplet().level() != 1)
+                    continue;
                 std::expected<ExtractorRecord, inference::ResourceError> record = std::unexpected{inference::ResourceError("Unsupported analysis contract")};
-                if (spec->interfaceId() == Note::API_INTERFACE) {
-                    record = read<Note::NoteSchema>(*spec, Kind::Note, **notePool, Note::createAnalyzer);
-                } else if (spec->interfaceId() == F0::API_INTERFACE) {
-                    record = read<F0::F0Schema>(*spec, Kind::Pitch, **pitchPool, F0::createAnalyzer);
-                } else if (spec->interfaceId() == Sep::API_INTERFACE) {
+                if (spec->triplet().contract() == Note::Contract) {
+                    record = read<Note::Exports>(*spec, Kind::Note, **notePool, Note::Executive::create);
+                } else if (spec->triplet().contract() == F0::Contract) {
+                    record = read<F0::Exports>(*spec, Kind::Pitch, **pitchPool, F0::Executive::create);
+                } else if (spec->triplet().contract() == Sep::Contract) {
                     record = readSeparation(*spec, **separationPool);
-                } else if (spec->interfaceId() == Beat::API_INTERFACE) {
+                } else if (spec->triplet().contract() == Beat::Contract) {
                     const auto *schema = dynamic_cast<const Beat::BeatSchema *>(spec->exports());
                     if (schema && schema->maxSegmentDuration == 0 && schema->downbeats)
                         record = read<Beat::BeatSchema>(*spec, Kind::Tempo, **tempoPool, Beat::createBeatTracker);
@@ -162,7 +176,8 @@ namespace dssp::extraction {
 
     CatalogResult<ExtractorInfo> ExtractorCatalog::metadata(Kind kind, std::string_view id, const localization::Context &locale) const {
         const auto *record = find(kind, id);
-        if (!record) return fail<CatalogErrors>(ResourceNotFoundError(locale.text("extraction.extractor_type_not_found", "Extractor does not exist for the requested type: {0}", id)));
+        if (!record)
+            return fail<CatalogErrors>(ResourceNotFoundError(locale.text("extraction.extractor_type_not_found", "Extractor does not exist for the requested type: {0}", id)));
         return present(*record, locale);
     }
 
@@ -170,11 +185,16 @@ namespace dssp::extraction {
         ExtractorList result;
         for (const auto &[id, record] : m_records) {
             auto info = present(record, locale);
-            if (!info) return std::unexpected{std::move(info.error())};
-            if (record.kind == Kind::Note) result.note.push_back(std::move(*info));
-            else if (record.kind == Kind::Pitch) result.pitch.push_back(std::move(*info));
-            else if (record.kind == Kind::Tempo) result.tempo.push_back(std::move(*info));
-            else if (record.kind == Kind::Separation) result.separation.push_back(std::move(*info));
+            if (!info)
+                return std::unexpected{std::move(info.error())};
+            if (record.kind == Kind::Note)
+                result.note.push_back(std::move(*info));
+            else if (record.kind == Kind::Pitch)
+                result.pitch.push_back(std::move(*info));
+            else if (record.kind == Kind::Tempo)
+                result.tempo.push_back(std::move(*info));
+            else if (record.kind == Kind::Separation)
+                result.separation.push_back(std::move(*info));
         }
 
         return result;

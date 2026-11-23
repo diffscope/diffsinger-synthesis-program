@@ -11,8 +11,8 @@
 #include <synthrt/Support/DisplayText.h>
 
 namespace srtsepinfer::Api::Separation::L1 {
-    inline constexpr char API_INTERFACE[] = "org.openvpi.srtsepinfer.inference.Separation";
-    inline constexpr int API_LEVEL = 1;
+    /// Identifies the separation contract.
+    inline const srt::ContribContract Contract{"org.openvpi.srtsepinfer.inference.Separation", 1};
 
     /// Interleaved finite float32 PCM. No decoding or resampling occurs in the library.
     struct AudioSegment {
@@ -29,31 +29,33 @@ namespace srtsepinfer::Api::Separation::L1 {
 
     class SRTSEPINFER_EXPORT SeparationSchema : public srt::ContribExports {
     public:
-        explicit SeparationSchema(std::string variant);
+        SeparationSchema() : ContribExports(Contract) {}
         ~SeparationSchema() override;
+
         int sampleRate = 0;
         int channelCount = 0;
         double maxSegmentDuration = 0; // 0: the interpreter partitions arbitrary-length audio.
         std::vector<TrackInfo> tracks; // Public result order; providers map the model's source axis.
     };
 
-    SRTSEPINFER_EXPORT srt::Expected<std::unique_ptr<SeparationSchema>> readSeparationSchema(const srt::ContribSpec &, std::string variant);
+    SRTSEPINFER_EXPORT srt::Expected<std::unique_ptr<SeparationSchema>>
+    readSeparationSchema(const srt::ContribSpec &spec);
 
     class SeparationImportOptions : public srt::ContribImportOptions {
     public:
-        explicit SeparationImportOptions(std::string variant) : ContribImportOptions(API_INTERFACE, std::move(variant), API_LEVEL) {}
+        SeparationImportOptions() : ContribImportOptions(Contract) {}
     };
 
     class SeparationRuntimeOptions : public srt::InferenceRuntimeOptions {
     public:
-        explicit SeparationRuntimeOptions(std::string variant) : InferenceRuntimeOptions(API_INTERFACE, std::move(variant), API_LEVEL) {}
+        SeparationRuntimeOptions() : InferenceRuntimeOptions(Contract) {}
     };
 
     class SeparationStartInput : public srt::TaskStartInput {
     public:
-        static constexpr const char *API_INTERFACE = L1::API_INTERFACE;
-        static constexpr int API_LEVEL = L1::API_LEVEL;
-        SeparationStartInput() : TaskStartInput(API_INTERFACE, API_LEVEL) {}
+        inline static const auto &Contract = L1::Contract;
+
+        SeparationStartInput() : TaskStartInput(Contract) {}
 
         AudioSegment audio;
         /// Returning false cancels the execution. Progress is monotonic in [0,1].
@@ -67,34 +69,50 @@ namespace srtsepinfer::Api::Separation::L1 {
 
     class SeparationResult : public srt::TaskResult {
     public:
-        static constexpr const char *API_INTERFACE = L1::API_INTERFACE;
-        static constexpr int API_LEVEL = L1::API_LEVEL;
-        SeparationResult() : TaskResult(API_INTERFACE, API_LEVEL) {}
+        inline static const auto &Contract = L1::Contract;
+
+        SeparationResult() : TaskResult(Contract) {}
 
         std::vector<Track> tracks;
     };
 
     class SRTSEPINFER_EXPORT SeparationExecutive : public srt::InferenceExecutive {
     public:
-        using AsyncCallback = std::function<void(srt::Expected<std::unique_ptr<SeparationResult>>)>;
+        using AsyncCallback =
+            std::function<void(srt::Expected<std::unique_ptr<SeparationResult>>)>;
         ~SeparationExecutive() override;
-        srt::Expected<std::unique_ptr<SeparationResult>> start(const SeparationStartInput &input) { return m_task.run(input); }
-        srt::Expected<void> startAsync(std::shared_ptr<const SeparationStartInput> input, AsyncCallback callback) { return m_task.runAsync(std::move(input), std::move(callback)); }
 
-        srt::ITask::State state() const noexcept override { return m_task.state(); }
-        srt::Expected<void> stop() override { return m_task.stop(); }
-        srt::Expected<void> waitForFinished() override { return m_task.waitForFinished(); }
+        srt::Expected<std::unique_ptr<SeparationResult>> start(const SeparationStartInput &input) {
+            return m_task.run(input);
+        }
+        srt::Expected<void> startAsync(std::shared_ptr<const SeparationStartInput> input,
+            AsyncCallback callback) {
+            return m_task.runAsync(std::move(input), std::move(callback));
+        }
+
+        srt::ITask::State state() const noexcept override {
+            return m_task.state();
+        }
 
     protected:
-        explicit SeparationExecutive(srt::InferenceSpec &);
-        virtual srt::Expected<std::unique_ptr<SeparationResult>> run(const SeparationStartInput &) = 0;
-        bool cancelled() const noexcept { return m_task.cancelled(); }
+        explicit SeparationExecutive(srt::InferenceSpec &spec);
+        virtual srt::Expected<std::unique_ptr<SeparationResult>>
+        run(const SeparationStartInput &input, const srt::TaskStopToken &token) = 0;
+
+        srt::Expected<void> quit() override {
+            return m_task.stop();
+        }
+        srt::Expected<void> wait() override {
+            return m_task.waitForFinished();
+        }
 
     private:
         // Providers must stop and wait before destroying objects read by run().
         SeparationTask<SeparationStartInput, SeparationResult> m_task;
     };
 
-    SRTSEPINFER_EXPORT srt::Expected<std::unique_ptr<SeparationExecutive>> createSeparator(srt::InferenceSpec &);
+    SRTSEPINFER_EXPORT srt::Expected<std::unique_ptr<SeparationExecutive>>
+    createSeparator(srt::InferenceSpec &spec);
 }
+
 #endif

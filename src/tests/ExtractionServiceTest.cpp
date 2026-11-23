@@ -1,12 +1,13 @@
+#include <dr_wav.h>
+
 #include <atomic>
 #include <chrono>
 #include <cmath>
 #include <future>
+#include <system_error>
 #include <thread>
 #include <type_traits>
-#include <system_error>
 
-#include <dr_wav.h>
 #include <gtest/gtest.h>
 #include <synthrt/Core/SynthUnit.h>
 
@@ -26,14 +27,16 @@ namespace dssp::tests {
         std::string wave(int rate, int channels, std::size_t frames) {
             std::vector<float> samples(frames * channels, 0.5f);
             if (channels == 2) {
-                for (std::size_t frame = 0; frame < frames; ++frame) samples[frame * 2 + 1] = -0.25f;
+                for (std::size_t frame = 0; frame < frames; ++frame)
+                    samples[frame * 2 + 1] = -0.25f;
             }
 
             const drwav_data_format format{drwav_container_riff, DR_WAVE_FORMAT_IEEE_FLOAT, static_cast<drwav_uint32>(channels), static_cast<drwav_uint32>(rate), 32};
             void *bytes = nullptr;
             std::size_t size = 0;
             drwav writer{};
-            if (!drwav_init_memory_write(&writer, &bytes, &size, &format, nullptr)) return {};
+            if (!drwav_init_memory_write(&writer, &bytes, &size, &format, nullptr))
+                return {};
             EXPECT_EQ(drwav_write_pcm_frames(&writer, frames, samples.data()), frames);
             EXPECT_EQ(drwav_uninit(&writer), DRWAV_SUCCESS);
 
@@ -43,44 +46,48 @@ namespace dssp::tests {
             return url;
         }
 
-        class TestNoteExecutive final : public Note::NoteExecutive {
+        class TestNoteExecutive final : public Note::Executive {
         public:
-            explicit TestNoteExecutive(srt::InferenceSpec &spec) : NoteExecutive(spec) {}
+            explicit TestNoteExecutive(srt::InferenceSpec &spec) : Note::Executive(spec) {}
 
         protected:
-            srt::Expected<std::unique_ptr<Note::NoteResult>> run(const Note::NoteStartInput &input) override {
+            srt::Expected<std::unique_ptr<Note::Result>> run(const Note::StartInput &input) override {
                 EXPECT_EQ(input.audio.channelCount, 1);
                 EXPECT_FALSE(input.language.has_value());
                 EXPECT_TRUE(input.knownNotes.empty());
-                for (const auto value : input.audio.samples) EXPECT_FLOAT_EQ(value, 0.125f);
+                for (const auto value : input.audio.samples)
+                    EXPECT_FLOAT_EQ(value, 0.125f);
                 if (input.progress) {
                     EXPECT_TRUE(input.progress(0));
                     EXPECT_TRUE(input.progress(0.3));
                     EXPECT_TRUE(input.progress(0.8));
                 }
 
-                auto result = std::make_unique<Note::NoteResult>();
+                auto result = std::make_unique<Note::Result>();
                 result->notes.push_back({60, input.audio.startTime, static_cast<double>(input.audio.samples.size()) / input.audio.sampleRate, 1});
-                if (input.progress) EXPECT_TRUE(input.progress(1));
+                if (input.progress)
+                    EXPECT_TRUE(input.progress(1));
                 return result;
             }
         };
 
-        class TestPitchExecutive final : public F0::F0Executive {
+        class TestPitchExecutive final : public F0::Executive {
         public:
-            TestPitchExecutive(srt::InferenceSpec &spec, std::shared_ptr<std::promise<void>> started = {}) : F0Executive(spec), m_started(std::move(started)) {}
+            TestPitchExecutive(srt::InferenceSpec &spec, std::shared_ptr<std::promise<void>> started = {}) : F0::Executive(spec), m_started(std::move(started)) {}
 
         protected:
-            srt::Expected<std::unique_ptr<F0::F0Result>> run(const F0::F0StartInput &input) override {
+            srt::Expected<std::unique_ptr<F0::Result>> run(const F0::StartInput &input) override {
                 if (m_started) {
                     m_started->set_value();
                     const auto deadline = std::chrono::steady_clock::now() + 2s;
-                    while (!cancelled() && std::chrono::steady_clock::now() < deadline) std::this_thread::sleep_for(1ms);
-                    if (cancelled()) return srt::Error(std::make_error_code(std::errc::operation_canceled), "Test analyzer was stopped");
+                    while (!cancelled() && std::chrono::steady_clock::now() < deadline)
+                        std::this_thread::sleep_for(1ms);
+                    if (cancelled())
+                        return srt::Error(std::make_error_code(std::errc::operation_canceled), "Test analyzer was stopped");
                     ADD_FAILURE() << "Native stop did not reach the analyzer";
                 }
 
-                auto result = std::make_unique<F0::F0Result>();
+                auto result = std::make_unique<F0::Result>();
                 result->interval = 0.01;
                 result->startTime = input.audio.startTime;
                 result->f0.resize(static_cast<std::size_t>(std::ceil(input.audio.samples.size() / 160.0)), 440);
@@ -110,8 +117,10 @@ namespace dssp::tests {
         }
 
         void TearDown() override {
-            if (m_service) m_service->shutdown();
-            if (m_environment) m_environment->shutdown();
+            if (m_service)
+                m_service->shutdown();
+            if (m_environment)
+                m_environment->shutdown();
         }
 
         void startService() {
@@ -126,7 +135,8 @@ namespace dssp::tests {
             ASSERT_NE(category, nullptr);
             srt::InferenceSpec *target = nullptr;
             for (auto *spec : category->inferences()) {
-                if (spec->locator().contributionId() == id) target = spec;
+                if (spec->locator().contributionId() == id)
+                    target = spec;
             }
 
             ASSERT_NE(target, nullptr);
@@ -139,8 +149,10 @@ namespace dssp::tests {
             definition.packages = {target->package()};
             definition.create = [target, started, loaded = m_loaded]() -> std::expected<std::unique_ptr<srt::InferenceExecutive>, inference::ExecutionError> {
                 ++*loaded;
-                if constexpr (std::is_same_v<Executive, TestPitchExecutive>) return std::make_unique<Executive>(*target, started);
-                else return std::make_unique<Executive>(*target);
+                if constexpr (std::is_same_v<Executive, TestPitchExecutive>)
+                    return std::make_unique<Executive>(*target, started);
+                else
+                    return std::make_unique<Executive>(*target);
             };
 
             ASSERT_TRUE((*pool)->bind(std::move(definition)));
@@ -248,7 +260,8 @@ namespace dssp::tests {
         std::vector<double> values;
         extraction::Input input{analysisNoteId, wave(44100, 2, 5292)};
         input.progress = resource::TaskProgress([&](resource::TaskUpdate update) {
-            if (update.state == resource::TaskUpdate::State::Progress) values.push_back(update.value);
+            if (update.state == resource::TaskUpdate::State::Progress)
+                values.push_back(update.value);
         });
         const auto result = await<extraction::NoteOutput>([&](auto callback) { m_service->note(input, {}, std::move(callback)); });
         ASSERT_TRUE(result) << result.error().asError().formatChain();
@@ -263,7 +276,8 @@ namespace dssp::tests {
             expected.push_back(completed / 0.12);
         }
         ASSERT_EQ(values.size(), expected.size());
-        for (std::size_t i = 0; i < values.size(); ++i) EXPECT_NEAR(values[i], expected[i], 1e-12);
+        for (std::size_t i = 0; i < values.size(); ++i)
+            EXPECT_NEAR(values[i], expected[i], 1e-12);
     }
 
     TEST_F(ExtractionServiceTest, NativeStopReachesAnExecutingOtterAnalyzer) {
@@ -306,7 +320,8 @@ namespace dssp::tests {
         ASSERT_NE(category, nullptr);
         srt::InferenceSpec *noteSpec = nullptr;
         for (auto *spec : category->inferences()) {
-            if (spec->locator().contributionId() == "note") noteSpec = spec;
+            if (spec->locator().contributionId() == "note")
+                noteSpec = spec;
         }
 
         ASSERT_NE(noteSpec, nullptr);
@@ -323,14 +338,14 @@ namespace dssp::tests {
         const auto handle = (*notePool)->bind(std::move(another));
         ASSERT_TRUE(handle);
 
-        const auto input = std::make_shared<Note::NoteStartInput>();
+        const auto input = std::make_shared<Note::StartInput>();
         input->audio.sampleRate = 44100;
         input->audio.channelCount = 1;
         input->audio.samples = {0.125f};
 
-        const auto promise = std::make_shared<std::promise<inference::ExecutionResult<std::unique_ptr<Note::NoteResult>>>>();
+        const auto promise = std::make_shared<std::promise<inference::ExecutionResult<std::unique_ptr<Note::Result>>>>();
         auto future = promise->get_future();
-        (*notePool)->run<Note::NoteExecutive>(*handle, {}, [input](auto &executive) { return executive.start(*input); }, [promise](auto result) { promise->set_value(std::move(result)); });
+        (*notePool)->run<Note::Executive>(*handle, {}, [input](auto &executive) { return executive.start(*input); }, [promise](auto result) { promise->set_value(std::move(result)); });
 
         ASSERT_EQ(future.wait_for(1s), std::future_status::ready);
         ASSERT_TRUE(future.get());

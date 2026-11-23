@@ -32,7 +32,8 @@ namespace dssp::tests {
         }
         for (const bool includeSteps : {false, true}) {
             extra = Json::Value(Json::objectValue);
-            if (includeSteps) extra["steps"] = Json::Value(Json::objectValue);
+            if (includeSteps)
+                extra["steps"] = Json::Value(Json::objectValue);
             const auto options = arch_diffsinger::synthesisOptions(extra);
             ASSERT_TRUE(options);
             EXPECT_EQ(options->steps.pitch, 20);
@@ -108,7 +109,10 @@ namespace dssp::tests {
             m_context = {Json::Value(Json::objectValue), {{singers->front().id, Json::Value(Json::objectValue)}}};
         }
 
-        void TearDown() override { if (m_environment) m_environment->shutdown(); }
+        void TearDown() override {
+            if (m_environment)
+                m_environment->shutdown();
+        }
 
         template <class Output, class Function>
         arch::SynthesisResult<Output> await(Function submit) {
@@ -328,7 +332,8 @@ namespace dssp::tests {
         ASSERT_TRUE(emptyStepsTag);
         EXPECT_EQ(*tag, *emptyStepsTag);
         auto explicitDefaults = m_context;
-        for (const auto stage : {"pitch", "variance", "acoustic"}) explicitDefaults.archExtra["steps"][stage] = 20;
+        for (const auto stage : {"pitch", "variance", "acoustic"})
+            explicitDefaults.archExtra["steps"][stage] = 20;
         explicitDefaults.archExtra["depth"] = 1;
         explicitDefaults.singers[0].extra["speaker"] = "";
         const auto same = m_implementation->envTag(explicitDefaults);
@@ -341,7 +346,8 @@ namespace dssp::tests {
             const auto changed = m_implementation->envTag(changedContext);
             ASSERT_TRUE(changed);
             EXPECT_NE(*tag, *changed);
-            for (const auto &previous : changedTags) EXPECT_NE(previous, *changed);
+            for (const auto &previous : changedTags)
+                EXPECT_NE(previous, *changed);
             changedTags.push_back(*changed);
         }
         auto unknown = m_context;
@@ -401,7 +407,7 @@ namespace dssp::tests {
             "dependencies":[{"id":"example/vocoder","version":"1"}],
             "contributions":{"inference":[{"id":"acoustic","path":"acoustic.json"}],"singer":[{"id":"main","path":"singer.json"}]}})");
         m_files.write(std::filesystem::path(m_packageDirectory) / "singer.json", R"({"interface":"org.openvpi.dsinfer.singer.DiffSinger","variant":"openvpi","level":1,
-            "name":"Test singer","configuration":{"dict":"unused-dictionary.txt"},"imports":[
+            "name":"Test singer","configuration":{"dict":"unused-dictionary.txt"},"exports":{},"imports":[
             {"role":"singer/acoustic","ref":":inference/acoustic","options":{}},
             {"role":"singer/vocoder","ref":"example/vocoder:inference/main","options":{}}]})");
         m_files.write(std::filesystem::path(vocoderDirectory) / "desc.json", R"({"$version":"1.0","id":"example/vocoder","version":"1","runtimeLevel":1,

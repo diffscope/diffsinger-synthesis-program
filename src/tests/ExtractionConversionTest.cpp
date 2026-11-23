@@ -42,7 +42,8 @@ namespace dssp::tests {
             EXPECT_EQ(span.begin, previous);
             EXPECT_EQ(span.begin % 160, 0U);
             EXPECT_LE(span.end - span.begin, 640U);
-            if (span.end != samples.size()) EXPECT_EQ(span.end % 160, 0U);
+            if (span.end != samples.size())
+                EXPECT_EQ(span.end % 160, 0U);
             previous = span.end;
         }
 
@@ -103,12 +104,12 @@ namespace dssp::tests {
 
     TEST(ExtractionResults, VoicedMaskWinsAndGapCountsFromThePreviousVoicedEnd) {
         extraction::PitchBuilder builder(0.01);
-        F0::F0Result first;
+        F0::Result first;
         first.interval = 0.01;
         first.f0 = {440, 440, 440};
         first.voiced = {0, 1, 0};
         ASSERT_TRUE(builder.append(first, 0, 0.03, 16000));
-        F0::F0Result second;
+        F0::Result second;
         second.interval = 0.01;
         second.startTime = 0.1;
         second.f0 = {440, 880};
@@ -124,11 +125,11 @@ namespace dssp::tests {
 
     TEST(ExtractionResults, AdjacentSpansMergeAndOnePaddedBoundaryFrameIsDiscarded) {
         extraction::PitchBuilder builder(0.01);
-        F0::F0Result first;
+        F0::Result first;
         first.interval = 0.01;
         first.f0 = {440, 440, 440};
         ASSERT_TRUE(builder.append(first, 0, 0.02, 16000));
-        F0::F0Result second;
+        F0::Result second;
         second.interval = 0.01;
         second.startTime = 0.02;
         second.f0 = {440, 440};
@@ -139,7 +140,7 @@ namespace dssp::tests {
     }
 
     TEST(ExtractionResults, InvalidModelCurvesFailAndUnvoicedInputRetainsFrameRate) {
-        F0::F0Result curve;
+        F0::Result curve;
         curve.interval = 0.01;
         curve.f0 = {440, 440};
         curve.voiced = {1};

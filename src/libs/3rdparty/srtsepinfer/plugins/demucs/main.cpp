@@ -28,7 +28,7 @@ namespace {
 
     class Configuration final : public srt::ContribConfiguration {
     public:
-        Configuration() : ContribConfiguration(Sep::API_INTERFACE, Variant, Sep::API_LEVEL) {}
+        Configuration() : ContribConfiguration(srt::ContribContractTriplet{Sep::Contract, Variant}) {}
 
         std::filesystem::path model;
         int segmentSamples = 0;
@@ -50,19 +50,20 @@ namespace {
             (void)m_session->close();
         }
 
-        srt::Expected<void> stop() override {
-            (void)SeparationExecutive::stop();
+    protected:
+        srt::Expected<void> quit() override {
+            (void)SeparationExecutive::quit();
             (void)m_session->stop();
             return {};
         }
 
-        srt::Expected<void> waitForFinished() override {
-            (void)SeparationExecutive::waitForFinished();
+        srt::Expected<void> wait() override {
+            (void)SeparationExecutive::wait();
             return m_session->waitForFinished();
         }
 
-    protected:
-        srt::Expected<std::unique_ptr<Sep::SeparationResult>> run(const Sep::SeparationStartInput &input) override {
+        srt::Expected<std::unique_ptr<Sep::SeparationResult>>
+        run(const Sep::SeparationStartInput &input, const srt::TaskStopToken &token) override {
             const auto &audio = input.audio;
             if (audio.sampleRate != m_schema.sampleRate || audio.channelCount != m_schema.channelCount || audio.samples.empty() || audio.samples.size() % audio.channelCount || !std::isfinite(audio.startTime) || audio.startTime < 0) {
                 return srt::Error(srt::Error::InvalidArgument, "Demucs requires nonempty, interleaved stereo audio at 44100 Hz with a finite nonnegative startTime");
@@ -82,11 +83,11 @@ namespace {
             for (std::size_t i = 0; i < sources; ++i)
                 identityMapping = identityMapping && m_configuration.trackMapping[i] == i;
 
-            const auto stopped = [this] { return cancelled(); };
+            const auto stopped = [&token] { return token.stopRequested(); };
             const auto progress = [&](double value) {
                 if (input.progress && !input.progress(value))
                     (void)stop();
-                return !cancelled();
+                return !token.stopRequested();
             };
             if (!progress(0))
                 return cancelledError();
@@ -119,7 +120,7 @@ namespace {
             const auto chunks = (count - 1) / stride + 1;
             std::size_t chunkIndex = 0;
             for (std::size_t offset = 0; offset < count; offset += stride) {
-                if (cancelled())
+                if (token.stopRequested())
                     return cancelledError();
 
                 const auto chunkLength = std::min(segment, count - offset);
@@ -152,10 +153,10 @@ namespace {
                 Onnx::SessionStartInput modelInput;
                 modelInput.inputs = {{"waveform", waveTensor.take()}, {"spectrogram", specTensor.take()}};
                 modelInput.outputs = {"spectrum", "waveform_sources"};
-                if (cancelled())
+                if (token.stopRequested())
                     return cancelledError();
                 auto ran = m_session->start(modelInput);
-                if (cancelled())
+                if (token.stopRequested())
                     return cancelledError();
                 if (!ran)
                     return ran.takeError().withContext("Demucs neural core failed");
@@ -211,7 +212,7 @@ namespace {
 
             for (auto &track : result->tracks) {
                 for (std::size_t i = 0; i < count; ++i) {
-                    if ((i & 65535) == 0 && cancelled())
+                    if ((i & 65535) == 0 && token.stopRequested())
                         return cancelledError();
                     for (int channel = 0; channel < 2; ++channel) {
                         auto &value = track.audio.samples[2 * i + channel];
@@ -235,7 +236,7 @@ namespace {
     class Interpreter final : public srtsepinfer::SeparationInterpreter {
     public:
         srt::Expected<std::unique_ptr<srt::ContribExports>> createExports(const srt::ContribSpec &spec) const override {
-            auto read = Sep::readSeparationSchema(spec, Variant);
+            auto read = Sep::readSeparationSchema(spec);
             if (!read)
                 return read.takeError();
 
@@ -284,7 +285,7 @@ namespace {
             if (configuration->segmentSamples != 343980 || configuration->fftSize != 4096 || configuration->hopLength != 1024 || !std::isfinite(configuration->overlap) || configuration->overlap < 0 || configuration->overlap > 0.5)
                 return srt::Error(srt::Error::InvalidFormat, "Unsupported HTDemucs graph geometry or overlap (expected 343980 samples, FFT 4096, hop 1024, overlap in [0,0.5])");
 
-            auto schema = Sep::readSeparationSchema(spec, Variant);
+            auto schema = Sep::readSeparationSchema(spec);
             if (!schema)
                 return schema.takeError();
             std::vector<std::string> exportedIds;
@@ -343,7 +344,7 @@ namespace {
             if (!schema || !configuration)
                 return srt::Error(SeparationError::ContractViolation, "Missing typed Demucs declaration");
 
-            auto *service = spec.package().synthUnit().runtimeService(ds::InferenceDriverPlugin::IID, Onnx::API_NAME);
+            auto *service = spec.package().synthUnit().runtimeService(ds::InferenceDriverPlugin::IID, Onnx::Contract.name());
             auto *driver = service ? service->as<ds::InferenceDriver>() : nullptr;
             if (!driver)
                 return srt::Error(srt::Error::FeatureNotSupported, "The ONNX inference driver is not registered on this SynthUnit");
@@ -362,8 +363,9 @@ namespace {
 
     class Plugin final : public srt::InferenceInterpreterPlugin {
     public:
-        srt::Expected<std::unique_ptr<srt::ContribInterpreter>> create(std::string_view interfaceName, int level, std::string_view variant) override {
-            if (interfaceName != Sep::API_INTERFACE || level != Sep::API_LEVEL || variant != Variant)
+        srt::Expected<std::unique_ptr<srt::ContribInterpreter>>
+        create(const srt::ContribContractTriplet &triplet) override {
+            if (triplet != srt::ContribContractTriplet{Sep::Contract, Variant})
                 return srt::Error(srt::Error::FeatureNotSupported, "This interpreter serves only Separation Level 1 variant demucs");
 
             return std::unique_ptr<srt::ContribInterpreter>(new Interpreter);

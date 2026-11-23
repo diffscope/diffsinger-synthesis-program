@@ -5,8 +5,13 @@
 #include <cstring>
 #include <future>
 
-#include <gtest/gtest.h>
+#include <dsinfer/Api/Inferences/Acoustic/1/AcousticOnnxApiL1.h>
+#include <dsinfer/Api/Inferences/Duration/1/DurationOnnxApiL1.h>
+#include <dsinfer/Api/Inferences/Pitch/1/PitchOnnxApiL1.h>
+#include <dsinfer/Api/Inferences/Variance/1/VarianceOnnxApiL1.h>
+#include <dsinfer/Api/Inferences/Vocoder/1/VocoderOnnxApiL1.h>
 #include <dsinfer/Api/Singers/DiffSinger/1/DiffSingerApiL1.h>
+#include <gtest/gtest.h>
 
 #include <dssparchdiffsinger/DiffSinger.h>
 #include <dssparchdiffsinger/Factory.h>
@@ -49,23 +54,23 @@ namespace dssp::tests {
 
             srt::ITask::State state() const noexcept override { return m_state; }
 
-            srt::Expected<void> stop() override {
+            srt::Expected<void> quit() override {
                 m_state = srt::ITask::Canceled;
                 return {};
             }
 
-            srt::Expected<void> waitForFinished() override { return {}; }
+            srt::Expected<void> wait() override { return {}; }
 
         private:
             Hook m_hook;
             std::atomic<srt::ITask::State> m_state = srt::ITask::Idle;
         };
 
-        using DurationExecutive = TestExecutive<Du::DurationExecutive, Du::DurationInitArgs, Du::DurationStartInput, Du::DurationResult>;
-        using PitchExecutive = TestExecutive<Pi::PitchExecutive, Pi::PitchInitArgs, Pi::PitchStartInput, Pi::PitchResult>;
-        using VarianceExecutive = TestExecutive<Va::VarianceExecutive, Va::VarianceInitArgs, Va::VarianceStartInput, Va::VarianceResult>;
-        using AcousticExecutive = TestExecutive<Ac::AcousticExecutive, Ac::AcousticInitArgs, Ac::AcousticStartInput, Ac::AcousticResult>;
-        using VocoderExecutive = TestExecutive<Vo::VocoderExecutive, Vo::VocoderInitArgs, Vo::VocoderStartInput, Vo::VocoderResult>;
+        using DurationExecutive = TestExecutive<Du::Executive, Du::InitArgs, Du::StartInput, Du::Result>;
+        using PitchExecutive = TestExecutive<Pi::Executive, Pi::InitArgs, Pi::StartInput, Pi::Result>;
+        using VarianceExecutive = TestExecutive<Va::Executive, Va::InitArgs, Va::StartInput, Va::Result>;
+        using AcousticExecutive = TestExecutive<Ac::Executive, Ac::InitArgs, Ac::StartInput, Ac::Result>;
+        using VocoderExecutive = TestExecutive<Vo::Executive, Vo::InitArgs, Vo::StartInput, Vo::Result>;
 
         const Common::InputParameterInfo *curve(const std::vector<Common::InputParameterInfo> &parameters, std::string_view tag) {
             const auto found = std::ranges::find_if(parameters, [&](const auto &value) { return value.tag.name() == tag; });
@@ -107,7 +112,8 @@ namespace dssp::tests {
 
         void TearDown() override {
             m_implementation.reset();
-            if (m_environment) m_environment->shutdown();
+            if (m_environment)
+                m_environment->shutdown();
         }
 
         template <class Executive>
@@ -120,8 +126,8 @@ namespace dssp::tests {
             const auto pool = m_environment->inferences(arch_diffsinger::synthesisCacheGroup(stage));
             ASSERT_TRUE(pool);
             const auto handle = (*pool)->bind({*key, std::string(arch_diffsinger::stageName(stage)), {m_singer->package, spec->package()}, [spec, hook = std::move(hook)]() -> std::expected<std::unique_ptr<srt::InferenceExecutive>, inference::ExecutionError> {
-                return std::make_unique<Executive>(*spec, hook);
-            }});
+                                                   return std::make_unique<Executive>(*spec, hook);
+                                               }});
             ASSERT_TRUE(handle);
         }
 
@@ -170,7 +176,7 @@ namespace dssp::tests {
     TEST_F(SynthesisPipelineTest, DurationRestoresSubmittedPhonemeOrigins) {
         install<DurationExecutive>(Stage::Duration, [](const auto &input) {
             EXPECT_EQ(input.words.size(), 2U);
-            auto result = std::make_unique<Du::DurationResult>();
+            auto result = std::make_unique<Du::Result>();
             result->durations = {0.15, 0.05, 0.3};
             return result;
         });
@@ -204,7 +210,7 @@ namespace dssp::tests {
                 EXPECT_DOUBLE_EQ(pitch->retake->end, 0.4);
             }
 
-            auto result = std::make_unique<Pi::PitchResult>();
+            auto result = std::make_unique<Pi::Result>();
             result->interval = 0.01;
             result->pitch.assign(50, 80);
             return result;
@@ -219,9 +225,10 @@ namespace dssp::tests {
                 EXPECT_DOUBLE_EQ(pitch->values[20], 92);
                 EXPECT_DOUBLE_EQ(pitch->values[40], 81);
                 EXPECT_TRUE(pitch->retake.has_value());
-                if (pitch->retake) EXPECT_DOUBLE_EQ(pitch->retake->end, 0);
+                if (pitch->retake)
+                    EXPECT_DOUBLE_EQ(pitch->retake->end, 0);
             }
-            auto result = std::make_unique<Va::VarianceResult>();
+            auto result = std::make_unique<Va::Result>();
             result->predictions.push_back({ds::ParamTag("energy"), std::vector<double>(50, -48), 0.01, std::nullopt});
             return result;
         });
@@ -231,7 +238,8 @@ namespace dssp::tests {
         input.context.archExtra["steps"]["acoustic"] = 36;
         std::vector<double> progress;
         input.progress = resource::TaskProgress([&](resource::TaskUpdate update) {
-            if (update.state == resource::TaskUpdate::State::Progress && update.value > 0) progress.push_back(update.value);
+            if (update.state == resource::TaskUpdate::State::Progress && update.value > 0)
+                progress.push_back(update.value);
         });
         const auto output = await<arch::ParameterOutput>([&](auto callback) { m_implementation->parameter(input, {}, std::move(callback)); });
         ASSERT_TRUE(output) << (output ? "" : output.error().asError().formatChain());
@@ -249,12 +257,12 @@ namespace dssp::tests {
 
     TEST_F(SynthesisPipelineTest, MalformedVarianceResultFailsTheWholeRequest) {
         install<PitchExecutive>(Stage::Pitch, [](const auto &) {
-            auto result = std::make_unique<Pi::PitchResult>();
+            auto result = std::make_unique<Pi::Result>();
             result->interval = 0.01;
             result->pitch.assign(50, 80);
             return result;
         });
-        install<VarianceExecutive>(Stage::Variance, [](const auto &) { return std::make_unique<Va::VarianceResult>(); });
+        install<VarianceExecutive>(Stage::Variance, [](const auto &) { return std::make_unique<Va::Result>(); });
         const auto input = parameterInput();
         const auto output = await<arch::ParameterOutput>([&](auto callback) { m_implementation->parameter(input, {}, std::move(callback)); });
         ASSERT_FALSE(output);
@@ -262,7 +270,7 @@ namespace dssp::tests {
     }
 
     TEST_F(SynthesisPipelineTest, AcousticAndVocoderRunOnceAndOriginalPitchSurvivesToneShiftAndEviction) {
-        const auto *configuration = dynamic_cast<const Ac::AcousticConfiguration *>(m_singer->stages.at("acoustic").spec->configuration());
+        const auto *configuration = dynamic_cast<const Ac::Onnx::Configuration *>(m_singer->stages.at("acoustic").spec->configuration());
         ASSERT_NE(configuration, nullptr);
         const double interval = static_cast<double>(configuration->hopSize) / configuration->sampleRate;
         const auto frames = static_cast<std::int64_t>(std::round(0.5 / interval));
@@ -274,15 +282,18 @@ namespace dssp::tests {
             EXPECT_FLOAT_EQ(input.depth, 0.75f);
             const auto *pitch = curve(input.parameters, "pitch");
             EXPECT_NE(pitch, nullptr);
-            if (pitch) EXPECT_DOUBLE_EQ(pitch->values.front(), 81);
+            if (pitch)
+                EXPECT_DOUBLE_EQ(pitch->values.front(), 81);
             EXPECT_EQ(curve(input.parameters, "tone_shift"), nullptr);
             const auto mel = ds::Tensor::createFilled<float>({1, frames, channels}, 0.1f);
             const auto f0 = ds::Tensor::createFilled<float>({1, frames}, 880);
             EXPECT_TRUE(mel);
             EXPECT_TRUE(f0);
-            auto result = std::make_unique<Ac::AcousticResult>();
-            if (mel) result->mel = mel.get();
-            if (f0) result->f0 = f0.get();
+            auto result = std::make_unique<Ac::Result>();
+            if (mel)
+                result->mel = mel.get();
+            if (f0)
+                result->f0 = f0.get();
             *originalMel = result->mel;
             return result;
         });
@@ -292,8 +303,9 @@ namespace dssp::tests {
             EXPECT_EQ(input.mel->shape()[1], frames);
             const auto f0 = input.f0->template view<float>();
             EXPECT_EQ(f0.size(), static_cast<std::size_t>(frames));
-            for (const auto value : f0) EXPECT_FLOAT_EQ(value, 440);
-            auto result = std::make_unique<Vo::VocoderResult>();
+            for (const auto value : f0)
+                EXPECT_FLOAT_EQ(value, 440);
+            auto result = std::make_unique<Vo::Result>();
             const float sample = 0.25f;
             result->audioData.resize(sizeof(sample));
             std::memcpy(result->audioData.data(), &sample, sizeof(sample));
@@ -306,12 +318,14 @@ namespace dssp::tests {
         input.context.archExtra["steps"]["acoustic"] = 30;
         input.context.archExtra["depth"] = 0.75;
         input.piece = piece();
-        for (const auto id : {"pitch", "energy", "gender", "velocity", "tone_shift"}) input.parameters.emplace(id, arch::AudioParameter{100, std::nullopt});
+        for (const auto id : {"pitch", "energy", "gender", "velocity", "tone_shift"})
+            input.parameters.emplace(id, arch::AudioParameter{100, std::nullopt});
         input.parameters.at("pitch").values = std::vector<double>{69.0 / 128};
         input.parameters.at("tone_shift").values = std::vector<double>{1};
         std::vector<double> progress;
         input.progress = resource::TaskProgress([&](resource::TaskUpdate update) {
-            if (update.state == resource::TaskUpdate::State::Progress && update.value > 0) progress.push_back(update.value);
+            if (update.state == resource::TaskUpdate::State::Progress && update.value > 0)
+                progress.push_back(update.value);
         });
         const auto output = await<arch::AudioOutput>([&](auto callback) { m_implementation->audio(input, {}, std::move(callback)); });
         ASSERT_TRUE(output) << (output ? "" : output.error().asError().formatChain());
@@ -335,20 +349,22 @@ namespace dssp::tests {
         install<AcousticExecutive>(Stage::Acoustic, [acousticCalls](const auto &input) {
             ++*acousticCalls;
             EXPECT_EQ(input.words.size(), 1U);
-            if (!input.words.empty()) EXPECT_EQ(input.words.front().phones.front().token, "AP");
+            if (!input.words.empty())
+                EXPECT_EQ(input.words.front().phones.front().token, "AP");
             // A successful native task with missing tensors is still an error.
-            return std::make_unique<Ac::AcousticResult>();
+            return std::make_unique<Ac::Result>();
         });
         install<VocoderExecutive>(Stage::Vocoder, [vocoderCalls](const auto &) {
             ++*vocoderCalls;
-            return std::make_unique<Vo::VocoderResult>();
+            return std::make_unique<Vo::Result>();
         });
         arch::AudioInput input;
         input.context = m_context;
         input.piece = piece();
         input.piece.notes[0].pronunciation = "AP";
         input.piece.notes[0].phonemes.clear();
-        for (const auto id : {"pitch", "energy", "gender", "velocity", "tone_shift"}) input.parameters.emplace(id, arch::AudioParameter{100, std::nullopt});
+        for (const auto id : {"pitch", "energy", "gender", "velocity", "tone_shift"})
+            input.parameters.emplace(id, arch::AudioParameter{100, std::nullopt});
         const auto output = await<arch::AudioOutput>([&](auto callback) { m_implementation->audio(input, {}, std::move(callback)); });
         ASSERT_FALSE(output);
         EXPECT_NE(output.error().get_if<arch::OperationError>(), nullptr);

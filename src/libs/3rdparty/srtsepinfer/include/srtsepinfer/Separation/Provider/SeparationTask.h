@@ -1,255 +1,115 @@
 // Adapted from otter (Apache-2.0); see LICENSE.otter and NOTICE.
-#ifndef SRTSEPINFER_ANALYSISTASK_H
-#define SRTSEPINFER_ANALYSISTASK_H
+#ifndef SRTSEPINFER_SEPARATIONTASK_H
+#define SRTSEPINFER_SEPARATIONTASK_H
 
-#include <atomic>
-#include <cstdint>
 #include <functional>
 #include <memory>
-#include <string>
-#include <thread>
 #include <utility>
 
 #include <srtsepinfer/Separation/SeparationError.h>
-#include <srtsepinfer/export.h>
 #include <synthrt/Support/Expected.h>
 #include <synthrt/Task/ITask.h>
 
 namespace srtsepinfer {
 
-    /// Task interface of one separator, built on \c srt::ITask.
+    /// Task of one separator, built on \c srt::ITask.
     ///
-    /// Every separator has the same obligations: one execution at a time, a state that a host can
-    /// read, a worker thread for the asynchronous entry point, a \c Canceled state for an
-    /// execution that reports \c SeparationError::Cancelled, and a destructor that does not return
-    /// while a worker is inside the body. \c srt::ITask already provides the state, the
-    /// cancellation flag and the wait. This class adds only the rules that the separation contracts
-    /// impose and the framework's default execution lacks:
+    /// \c srt::ITask owns the execution claim, the worker thread, the stop request and the wait.
+    /// This class adds only the conversions between the untyped payloads and the payloads of a
+    /// contract, and it reports \c SeparationError::Cancelled as \c Canceled.
     ///
-    /// - A stop request applies to the execution that it targets. The claim, which is the
-    ///   exclusive right to run one execution, is taken on the caller's thread, in start() and
-    ///   startAsync(), and the stop request of the previous execution is discarded at that point.
-    ///   A stop() that arrives after startAsync() has returned and before the worker reaches the
-    ///   body therefore applies to the new execution instead of being cleared by it. An execution
-    ///   started synchronously from inside a callback inherits the claim rather than taking it.
-    ///   Such an execution discards the stop request after it detects the callback context.
-    /// - A callback may start the next execution or destroy the separator. The worker that
-    ///   delivers the callback releases the execution only after the callback returns, so that a
-    ///   waiter also waits for the callback. A start from inside the callback takes over the
-    ///   running state from its predecessor rather than being rejected as a second concurrent
-    ///   execution. An exception thrown by a callback is caught at the point of delivery, as in
-    ///   the framework's default execution, because an exception that leaves a worker thread
-    ///   terminates the process.
-    /// - The state of a finished execution is determined by its error code, never by the stop
-    ///   flag: the code \c SeparationError::Cancelled yields \c Canceled, any other error yields
-    ///   \c Failed, and a result yields \c Succeeded. A caller that branches on the code and a
-    ///   caller that reads the state therefore reach the same conclusion, including when a stop
-    ///   request arrives just after a body returned a result or failed for another reason. An
-    ///   exception thrown by the body is reported as \c SeparationError::Internal.
-    ///
-    /// This class implements these rules once, in the library. SeparationTask adds only the
-    /// conversions between the untyped payloads and the payloads of a contract.
-    class SRTSEPINFER_EXPORT SeparationTaskBase : public srt::ITask {
-    public:
-        ~SeparationTaskBase() override;
-
-        /// Returns whether a stop has been requested for the claimed execution.
-        ///
-        /// A body checks this flag at the granularity at which it can stop, and returns
-        /// cancelledError() if the flag is set. A cancelled execution reports \c Canceled and no
-        /// result.
-        bool cancelled() const noexcept {
-            return m_stopRequested.load();
-        }
-
-        /// \name Untyped ITask interface
-        /// \{
-
-        /// Runs the body on the calling thread.
-        ///
-        /// A direct call is a synchronous execution and takes the claim itself. A call from the
-        /// worker of startAsync() uses the claim that startAsync() already took.
-        ///
-        /// This function is the public entry point of srt::ITask, so \a input may be a payload of
-        /// any contract. Its type() and version() must equal the input type and version for which
-        /// the task was created. Any other payload is rejected with \c InvalidArgument before the
-        /// claim is taken, so that a rejected call leaves the state of the separator unchanged.
-        ///
-        /// \return The result of the body. An \c InvalidArgument error for a payload of another
-        /// contract or during another execution. An \c SeparationError::Internal error if the body
-        /// throws or returns no result. Otherwise the error that the body returned.
-        srt::Expected<std::unique_ptr<srt::TaskResult>>
-        start(const srt::TaskStartInput &input) override;
-
-        /// Runs the body on a worker thread and delivers the outcome to \a callback.
-        ///
-        /// \return An empty value if the worker started. An \c InvalidArgument error if \a input
-        /// or \a callback is empty, if \a input is a payload of another contract, or if another
-        /// execution is running. An \c SeparationError::NoWorker error if no worker thread could be
-        /// started.
-        srt::Expected<void> startAsync(std::shared_ptr<const srt::TaskStartInput> input,
-            AsyncCallback callback) override;
-
-        /// Requests cancellation of the current execution.
-        ///
-        /// \return An empty value. The request cannot fail.
-        srt::Expected<void> stop() override;
-
-        /// Waits for the current execution and, for an asynchronous execution, its callback.
-        ///
-        /// The function returns immediately if it is called from the worker of that execution,
-        /// so that a callback that destroys the separator does not deadlock.
-        ///
-        /// \return An empty value.
-        srt::Expected<void> waitForFinished() override;
-        /// \}
-
-    protected:
-        /// Initializes the task for start inputs of payload type \a inputType and version
-        /// \a inputVersion, which are those of the contract. \a inputType must outlive this
-        /// object, as a string literal does.
-        SeparationTaskBase(const char *inputType, int inputVersion);
-
-        /// Runs the body on an input that has already been checked to belong to the contract.
-        ///
-        /// The function may throw. An exception is reported as \c SeparationError::Internal.
-        virtual srt::Expected<std::unique_ptr<srt::TaskResult>>
-        execute(const srt::TaskStartInput &input) = 0;
-
-        /// Starts a detached thread running \a work.
-        ///
-        /// Throws \c std::system_error when no thread can be started, which startAsync() reports
-        /// as \c SeparationError::NoWorker. The function is virtual so that tests can simulate
-        /// the failure.
-        virtual void startWorker(std::function<void()> work);
-
-    private:
-        srt::Expected<void> checkInput(const srt::TaskStartInput &input) const;
-
-        bool claimedByThisThread() const;
-
-        // Returns whether the calling thread is a worker currently delivering its callback.
-        //
-        // The result distinguishes the body of an execution from an execution started inside the
-        // callback of the preceding execution: both run on the same thread and hold the claim.
-        bool deliveringCallback() const;
-
-        // Takes the claim for a synchronous execution on the calling thread.
-        srt::Expected<void> claim();
-
-        void release();
-
-        const char *m_inputType;
-        int m_inputVersion;
-
-        std::atomic_bool m_stopRequested = false;
-
-        // Number of claims taken, which lets the worker that delivered a callback determine
-        // whether the running state it is about to release still belongs to its execution. The
-        // counter is shared because the worker may outlive this object.
-        std::shared_ptr<std::atomic<std::uint64_t>> m_generation;
-
-        // Identifier of the worker currently inside its callback, or a default-constructed
-        // identifier if no worker is inside a callback. The value is shared for the same reason
-        // as the generation counter: the callback may destroy this object, and the worker must
-        // still reset the value afterwards.
-        std::shared_ptr<std::atomic<std::thread::id>> m_callbackWorker;
-    };
-
-    /// Task interface of an separator of one contract, which extends SeparationTaskBase with the
-    /// input and result types of the contract.
-    ///
-    /// \a Input and \a Result are the start input and the result of the contract, and declare
-    /// their payload type and version as the static members \c API_INTERFACE and \c API_LEVEL.
-    /// The body is a callable that captures the executive. The executive therefore declares this
-    /// member last, and its destructor calls stop() and waitForFinished() before any object that
-    /// the body reads is destroyed.
+    /// The body is a callable that receives the stop token of its execution. The executive holds
+    /// this task as its last member and calls stop() and waitForFinished() before it destroys any
+    /// object that the body reads.
     template <class Input, class Result>
-    class SeparationTask : public SeparationTaskBase {
+    class SeparationTask : public srt::ITask {
     public:
-        using Body = std::function<srt::Expected<std::unique_ptr<Result>>(const Input &)>;
+        using Body = std::function<srt::Expected<std::unique_ptr<Result>>(
+            const Input &input, const srt::TaskStopToken &token)>;
         using TypedCallback = std::function<void(srt::Expected<std::unique_ptr<Result>> result)>;
 
-        explicit SeparationTask(Body body)
-            : SeparationTaskBase(Input::API_INTERFACE, Input::API_LEVEL), m_body(std::move(body)) {
+        explicit SeparationTask(Body body) : srt::ITask(Input::Contract), m_body(std::move(body)) {
         }
-
-        ~SeparationTask() override = default;
-
-        /// \name Typed interface exposed by the executives
-        /// \{
 
         /// Runs the body synchronously on \a input.
         ///
-        /// \return The result of the body, the error of start(), or an
-        /// \c SeparationError::ContractViolation error if the result belongs to another contract.
+        /// \return The result of the body, or an \c InvalidArgument error for a payload of
+        /// another contract or during another execution.
         srt::Expected<std::unique_ptr<Result>> run(const Input &input) {
             auto result = start(static_cast<const srt::TaskStartInput &>(input));
             if (!result) {
                 return result.takeError();
             }
-
             return toResult(result.take());
         }
 
         /// Runs the body on a worker thread and delivers the typed outcome to \a callback.
-        ///
-        /// \return An empty value if the worker started, an \c InvalidArgument error if
-        /// \a callback is empty, and otherwise the error of startAsync().
         srt::Expected<void> runAsync(std::shared_ptr<const Input> input, TypedCallback callback) {
             if (!callback) {
                 return srt::Error(srt::Error::InvalidArgument,
                     "an asynchronous callback must not be empty");
             }
-
-            return startAsync(std::static_pointer_cast<const srt::TaskStartInput>(std::move(input)),
+            auto started = startAsync(
+                std::static_pointer_cast<const srt::TaskStartInput>(std::move(input)),
                 [callback = std::move(callback)](
                     srt::Expected<std::unique_ptr<srt::TaskResult>> result) mutable {
                     if (!result) {
                         callback(result.takeError());
                         return;
                     }
-
                     callback(toResult(result.take()));
                 });
+            if (!started) {
+                return started.takeError();
+            }
+            return {};
         }
-        /// \}
 
     protected:
         srt::Expected<std::unique_ptr<srt::TaskResult>>
-        execute(const srt::TaskStartInput &input) override {
-            auto result = m_body(static_cast<const Input &>(input));
+        execute(const srt::TaskStartInput &input, const srt::TaskStopToken &token) override {
+            auto result = m_body(static_cast<const Input &>(input), token);
             if (!result) {
                 return result.takeError();
             }
-
             return std::unique_ptr<srt::TaskResult>(result.take().release());
         }
 
+        State classifyOutcome(const srt::Expected<std::unique_ptr<srt::TaskResult>> &outcome,
+            bool) noexcept override {
+            if (outcome) {
+                return Succeeded;
+            }
+            return outcome.error().code() == SeparationError::Cancelled ? Canceled : Failed;
+        }
+
+        srt::Expected<void> startWorker(std::function<void()> work) override {
+            auto started = ITask::startWorker(std::move(work));
+            if (!started) {
+                return srt::Error(SeparationError::NoWorker, started.error().message());
+            }
+            return {};
+        }
+
     private:
-        // Converts an untyped result to the result type of the contract after checking its
-        // payload type and version.
-        //
-        // start() is virtual, so its return value is not guaranteed to come from the body. A
-        // missing result is an internal fault of the separator and is reported as
-        // \c SeparationError::Internal, and a result of another contract is reported as
-        // \c SeparationError::ContractViolation.
+        // Converts an untyped result to the result type of the contract after checking that it
+        // belongs to the contract.
         static srt::Expected<std::unique_ptr<Result>>
         toResult(std::unique_ptr<srt::TaskResult> result) {
             if (!result) {
                 return srt::Error(SeparationError::Internal, "the separation produced no result");
             }
-            if (result->type() != Result::API_INTERFACE || result->version() != Result::API_LEVEL) {
+            if (result->contract() != Result::Contract) {
                 return srt::Error(SeparationError::ContractViolation,
-                    "the separation produced a " + result->type() + " level " +
-                        std::to_string(result->version()) + " result");
+                    "the separation produced a " + result->contract().toString() +
+                        " result");
             }
-
             return std::unique_ptr<Result>(static_cast<Result *>(result.release()));
         }
 
         Body m_body;
     };
+
 }
 
-#endif // SRTSEPINFER_ANALYSISTASK_H
+#endif // SRTSEPINFER_SEPARATIONTASK_H

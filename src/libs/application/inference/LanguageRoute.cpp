@@ -2,11 +2,13 @@
 
 #include <exception>
 
+#include <dsinfer/Api/Singers/DiffSinger/1/DiffSingerApiL1.h>
 #include <synthrt/Core/ContribImportBinding.h>
-#include <wolf/Api/Inferences/G2P/1/G2PApiL1.h>
+#include <wolf/Api/Inferences/G2p/1/G2pApiL1.h>
 #include <wolf/Api/Inferences/Onset/1/OnsetApiL1.h>
-#include <wolf/Api/Inferences/S2P/1/S2PApiL1.h>
+#include <wolf/Api/Inferences/S2p/1/S2pApiL1.h>
 #include <wolf/Api/Linguists/Linguist/1/LinguistApiL1.h>
+#include <wolf/Api/Linguists/Linguist/1/LinguistWolfApiL1.h>
 
 namespace dssp::inference {
     namespace {
@@ -28,7 +30,7 @@ namespace dssp::inference {
             const auto &target = binding->target();
             const auto *exports = dynamic_cast<const Exports *>(target.exports());
             const auto *options = dynamic_cast<const Options *>(imported->options());
-            if (!exports || !options || target.locator().category() != "inference" || target.interfaceId() != exports->interfaceId() || target.variant() != exports->variant() || target.level() != exports->level()) {
+            if (!exports || !options || target.locator().category() != "inference" || target.triplet().contract() != exports->contract()) {
                 return std::unexpected{ResourceError("Unsupported language stage contract for " + std::string(role))};
             }
 
@@ -37,8 +39,8 @@ namespace dssp::inference {
     }
 
     std::expected<LanguageRoute, ResourceError> readLanguageRoute(const srt::SingerSpec &singer, std::string_view handle) {
-        namespace G2p = wolf::Api::G2P::L1;
-        namespace S2p = wolf::Api::S2P::L1;
+        namespace G2p = wolf::Api::G2p::L1;
+        namespace S2p = wolf::Api::S2p::L1;
         namespace Onset = wolf::Api::Onset::L1;
         namespace Linguist = wolf::Api::Linguist::L1;
         try {
@@ -47,8 +49,13 @@ namespace dssp::inference {
                 return std::unexpected{ResourceError("Singer has no resolved Wolf language metadata for " + std::string(handle))};
             }
 
-            const auto role = singer.languages().find(std::string(handle));
-            if (role == singer.languages().end()) {
+            const auto *singerExports =
+                dynamic_cast<const ds::Api::DiffSinger::L1::Exports *>(singer.exports());
+            if (!singerExports) {
+                return std::unexpected{ResourceError("The DiffSinger singer exports are unavailable")};
+            }
+            const auto role = singerExports->languages.find(std::string(handle));
+            if (role == singerExports->languages.end()) {
                 return std::unexpected{ResourceError("Singer does not declare language " + std::string(handle))};
             }
 
@@ -59,13 +66,13 @@ namespace dssp::inference {
 
             const auto &target = imported->binding()->target();
             const auto *spec = dynamic_cast<const wolf::LinguistSpec *>(&target);
-            if (!spec || target.interfaceId() != Linguist::API_INTERFACE || target.variant() != Linguist::API_VARIANT || target.level() != Linguist::API_LEVEL) {
+            if (!spec || target.triplet() != Linguist::Wolf::Triplet) {
                 return std::unexpected{ResourceError("Unsupported linguist composition for " + std::string(handle))};
             }
 
-            auto g2p = stage<G2p::G2PExports, G2p::G2PImportOptions>(target, Linguist::ROLE_G2P, true);
-            auto s2p = stage<S2p::S2PExports, S2p::S2PImportOptions>(target, Linguist::ROLE_S2P, false);
-            auto onset = stage<Onset::OnsetExports, Onset::OnsetImportOptions>(target, Linguist::ROLE_ONSET, false);
+            auto g2p = stage<G2p::Exports, G2p::ImportOptions>(target, Linguist::ROLE_G2P, true);
+            auto s2p = stage<S2p::Exports, S2p::ImportOptions>(target, Linguist::ROLE_S2P, false);
+            auto onset = stage<Onset::Exports, Onset::ImportOptions>(target, Linguist::ROLE_ONSET, false);
             if (!g2p) {
                 return std::unexpected{std::move(g2p.error())};
             }

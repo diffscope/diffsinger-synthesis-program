@@ -10,8 +10,8 @@
 #include <stdcorelib/support/logging.h>
 #include <synthrt/Core/ContribImportBinding.h>
 
-#include <dsspinference/ResourceIdentity.h>
 #include <dsspinference/ParallelismPolicy.h>
+#include <dsspinference/ResourceIdentity.h>
 #include <dsspresource/LruCache.h>
 #include <dsspresource/SerialQueue.h>
 #include <dsspresource/WorkerPool.h>
@@ -101,7 +101,9 @@ namespace dssp::inference {
 
     InferencePool::InferencePool(std::unique_ptr<Impl> impl) : m_impl(std::move(impl)) {}
 
-    InferencePool::~InferencePool() { shutdown(); }
+    InferencePool::~InferencePool() {
+        shutdown();
+    }
 
     std::expected<InferenceDefinition, ExecutionError> InferencePool::importDefinition(const srt::ContribImport &imported, std::shared_ptr<const srt::InferenceRuntimeOptions> options, const srt::JsonValue &effectiveRuntime) {
         try {
@@ -112,7 +114,7 @@ namespace dssp::inference {
 
             auto &target = binding->target();
             auto *spec = dynamic_cast<srt::InferenceSpec *>(&target);
-            if (!spec || options->interfaceId() != target.interfaceId() || options->variant() != target.variant() || options->level() != target.level()) {
+            if (!spec || options->contract() != target.triplet().contract()) {
                 return std::unexpected{ExecutionError("Inference runtime options do not match the resolved import")};
             }
             const auto *importOptions = &binding->options();
@@ -171,7 +173,8 @@ namespace dssp::inference {
             // Closing completes queued requests with the dispatch diagnostic;
             // this only clears the rejected drain's scheduled state.
             task();
-        }, m_impl->group + "/" + resource->definition.label + "#" + resource->definition.key.substr(0, 12));
+        },
+            m_impl->group + "/" + resource->definition.label + "#" + resource->definition.key.substr(0, 12));
         m_impl->resources.emplace(resource->definition.key, resource);
         return InferenceHandle(std::move(resource));
     }
@@ -184,7 +187,8 @@ namespace dssp::inference {
 
         const auto error = std::make_shared<std::optional<ExecutionError>>();
         const auto admissionCancelled = std::make_shared<bool>(false);
-        if (!stop.stop_requested()) progress.queue();
+        if (!stop.stop_requested())
+            progress.queue();
         handle->queue->submit({{}, [handle, error, admissionCancelled, complete = std::move(complete)](bool cancelled) mutable {
             std::optional<ExecutionError> dispatchError;
             {
@@ -192,18 +196,16 @@ namespace dssp::inference {
                 dispatchError = handle->dispatchError;
             }
             if (dispatchError) complete(std::move(dispatchError), false);
-            else complete(std::move(*error), cancelled || *admissionCancelled);
-        }, [this, handle, error, admissionCancelled, run = std::move(run)](std::stop_token token, auto finish) {
-            drogon::async_run([this, handle, error, admissionCancelled, run, token, finish = std::move(finish)]() mutable -> drogon::Task<> {
-                *admissionCancelled = co_await execute(handle, token, error, std::move(run));
-                finish();
-            });
-        }}, stop);
+            else complete(std::move(*error), cancelled || *admissionCancelled); }, [this, handle, error, admissionCancelled, run = std::move(run)](std::stop_token token, auto finish) { drogon::async_run([this, handle, error, admissionCancelled, run, token, finish = std::move(finish)]() mutable -> drogon::Task<> {
+                                                                                                                                                                                                                                              *admissionCancelled = co_await execute(handle, token, error, std::move(run));
+                                                                                                                                                                                                                                              finish();
+                                                                                                                                                                                                                                          }); }}, stop);
     }
 
     drogon::Task<bool> InferencePool::execute(InferenceHandle handle, std::stop_token token, std::shared_ptr<std::optional<ExecutionError>> error, std::function<bool(TaskExecutive &, std::stop_token)> run) {
         auto *impl = m_impl.get();
-        if (token.stop_requested()) co_return true;
+        if (token.stop_requested())
+            co_return true;
         auto lease = impl->cache.acquire(handle->definition.key);
         if (!lease) {
             auto created = handle->definition.create();
@@ -230,7 +232,8 @@ namespace dssp::inference {
         if (impl->serialExecution && !handle->definition.parallelSafe) {
             log.stdcTrace("Awaiting DirectML execution admission for inference %1", handle->definition.label);
             auto admitted = co_await impl->serialExecution->acquire(token);
-            if (!admitted) co_return true;
+            if (!admitted)
+                co_return true;
             permit.emplace(std::move(*admitted));
             log.stdcTrace("Acquired DirectML execution admission for inference %1", handle->definition.label);
         }
@@ -239,7 +242,8 @@ namespace dssp::inference {
         {
             std::atomic_flag nativeStopRequested = ATOMIC_FLAG_INIT;
             const auto requestStop = [&] {
-                if (nativeStopRequested.test_and_set(std::memory_order_acq_rel)) return;
+                if (nativeStopRequested.test_and_set(std::memory_order_acq_rel))
+                    return;
                 log.stdcTrace("Requesting stop for inference %1", handle->definition.label);
                 auto stopped = executive.stop();
                 if (!stopped) {
@@ -270,9 +274,13 @@ namespace dssp::inference {
         co_return token.stop_requested() || (permit && permit->cancellation().stop_requested());
     }
 
-    std::size_t InferencePool::residentCount() const { return m_impl->cache.size(); }
+    std::size_t InferencePool::residentCount() const {
+        return m_impl->cache.size();
+    }
 
-    void InferencePool::sweep() { m_impl->cache.sweep(); }
+    void InferencePool::sweep() {
+        m_impl->cache.sweep();
+    }
 
     void InferencePool::shutdown() {
         std::call_once(m_impl->shutdownOnce, [&] {

@@ -53,6 +53,9 @@ target_compile_features(dssp_http_streaming_tests PRIVATE cxx_std_23)
 target_link_libraries(dssp_http_streaming_tests PRIVATE dssp_api_v1 GTest::gtest_main)
 target_compile_definitions(dssp_http_streaming_tests PRIVATE DSSP_TEST_RESOURCE_DIR="${DSSP_RESOURCE_BUILD_DIR}")
 
+# The plugin directories that these tests load are staged by the application target.
+add_dependencies(dssp_http_access_log_tests dssp)
+
 # Backend and composition tests are isolated from the HTTP/API target.
 add_executable(dssp_arch_diffsinger_tests DiffSingerTest.cpp SingerDiscoveryTest.cpp LanguagePredictionTest.cpp SynthesisConversionTest.cpp SynthesisTest.cpp SynthesisPipelineTest.cpp ../app/ArchComposition.cpp)
 target_compile_features(dssp_arch_diffsinger_tests PRIVATE cxx_std_23)
@@ -60,14 +63,18 @@ target_link_libraries(dssp_arch_diffsinger_tests PRIVATE dssp_arch_diffsinger GT
 target_compile_definitions(dssp_arch_diffsinger_tests PRIVATE DSSP_TEST_RESOURCE_DIR="${DSSP_RESOURCE_BUILD_DIR}")
 
 get_filename_component(_test_vcpkg_prefix "${ONNXRUNTIME_BUILDS_INCLUDE_DIR}" DIRECTORY)
-target_compile_definitions(dssp_http_access_log_tests PRIVATE DSSP_TEST_PLUGIN_DIR="${_test_vcpkg_prefix}/$<$<CONFIG:Debug>:debug/>lib/plugins")
-target_compile_definitions(dssp_arch_diffsinger_tests PRIVATE DSSP_TEST_PLUGIN_DIR="${_test_vcpkg_prefix}/$<$<CONFIG:Debug>:debug/>lib/plugins")
+target_compile_definitions(dssp_http_access_log_tests PRIVATE DSSP_TEST_PLUGIN_DIR="${DSSP_BUILD_PLUGINS_DIR}")
+target_compile_definitions(dssp_arch_diffsinger_tests PRIVATE DSSP_TEST_PLUGIN_DIR="${DSSP_BUILD_PLUGINS_DIR}")
+
+add_dependencies(dssp_arch_diffsinger_tests dssp)
 
 # This host test deliberately has no architecture target in its link graph.
 add_executable(dssp_inference_tests InferenceTest.cpp InferencePoolTest.cpp ParallelismPolicyTest.cpp PackageStoreLockTest.cpp)
 target_compile_features(dssp_inference_tests PRIVATE cxx_std_23)
 target_link_libraries(dssp_inference_tests PRIVATE dssp_inference GTest::gtest_main unofficial::sqlite3::sqlite3)
-target_compile_definitions(dssp_inference_tests PRIVATE DSSP_TEST_PLUGIN_DIR="${_test_vcpkg_prefix}/$<$<CONFIG:Debug>:debug/>lib/plugins")
+target_compile_definitions(dssp_inference_tests PRIVATE DSSP_TEST_PLUGIN_DIR="${DSSP_BUILD_PLUGINS_DIR}")
+
+add_dependencies(dssp_inference_tests dssp)
 
 add_executable(dssp_resource_tests ResourceTest.cpp TaskExecutorTest.cpp WorkerPoolTest.cpp ExecutionGateTest.cpp CoroutineTest.cpp)
 target_compile_features(dssp_resource_tests PRIVATE cxx_std_23)
@@ -77,7 +84,9 @@ add_executable(dssp_extraction_tests ExtractionConversionTest.cpp ExtractionServ
 target_compile_features(dssp_extraction_tests PRIVATE cxx_std_23)
 target_link_libraries(dssp_extraction_tests PRIVATE dssp_extraction dssp_codecutil GTest::gtest_main)
 target_include_directories(dssp_extraction_tests PRIVATE "${DSSP_DRWAV_INCLUDE_DIR}")
-target_compile_definitions(dssp_extraction_tests PRIVATE DSSP_TEST_PLUGIN_DIR="${_test_vcpkg_prefix}/$<$<CONFIG:Debug>:debug/>lib/plugins")
+target_compile_definitions(dssp_extraction_tests PRIVATE DSSP_TEST_PLUGIN_DIR="${DSSP_BUILD_PLUGINS_DIR}")
+
+add_dependencies(dssp_extraction_tests dssp)
 
 add_executable(dssp_metadata_resources_tests CodecutilTest.cpp LocalizationTest.cpp MediaPathTest.cpp MediaResourceTest.cpp WaveTest.cpp)
 target_compile_features(dssp_metadata_resources_tests PRIVATE cxx_std_23)

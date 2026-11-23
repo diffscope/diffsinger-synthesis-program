@@ -4,7 +4,7 @@
 #include <expected>
 
 #include <synthrt/Support/DisplayText.h>
-#include <synthrt/Support/JSON.h>
+#include <synthrt/Support/Json.h>
 
 #include <dsspinference/InferenceError.h>
 

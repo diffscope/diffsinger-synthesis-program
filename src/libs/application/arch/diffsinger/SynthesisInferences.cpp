@@ -4,6 +4,11 @@
 #include <functional>
 #include <mutex>
 
+#include <dsinfer/Api/Inferences/Acoustic/1/AcousticOnnxApiL1.h>
+#include <dsinfer/Api/Inferences/Duration/1/DurationOnnxApiL1.h>
+#include <dsinfer/Api/Inferences/Pitch/1/PitchOnnxApiL1.h>
+#include <dsinfer/Api/Inferences/Variance/1/VarianceOnnxApiL1.h>
+#include <dsinfer/Api/Inferences/Vocoder/1/VocoderOnnxApiL1.h>
 #include <dsinfer/Api/Singers/DiffSinger/1/DiffSingerApiL1.h>
 
 #include <dsspinference/ResourceIdentity.h>
@@ -24,7 +29,7 @@ namespace dssp::arch_diffsinger {
         };
 
         template <class Executive, class Options, class InitArgs, class Create>
-        std::expected<std::unique_ptr<srt::InferenceExecutive>, inference::ExecutionError> createStage(Ds::DiffSingerPipelineExecutive &pipeline, Create create) {
+        std::expected<std::unique_ptr<srt::InferenceExecutive>, inference::ExecutionError> createStage(Ds::PipelineExecutive &pipeline, Create create) {
             auto created = inference::nativeCall("DiffSinger pipeline create stage", [&] { return std::invoke(create, pipeline, Options{}); });
             if (!created) {
                 return std::unexpected{std::move(created.error())};
@@ -128,30 +133,30 @@ namespace dssp::arch_diffsinger {
             definition.create = [factory, spec = singer.spec, stage]() -> std::expected<std::unique_ptr<srt::InferenceExecutive>, inference::ExecutionError> {
                 const std::lock_guard lock(factory->mutex);
                 if (!factory->pipeline) {
-                    auto *extension = srt::ContribSpecExtension::findFromSpec<Ds::DiffSingerPipelineExecutive>(*spec);
+                    auto *extension = srt::ContribSpecExtension::findFromSpec<Ds::PipelineExecutive>(*spec);
                     auto *typed = dynamic_cast<srt::SingerPipelineExtension *>(extension);
                     if (!typed) {
                         return std::unexpected{inference::ExecutionError("DiffSinger pipeline extension is unavailable")};
                     }
 
-                    auto created = inference::nativeCall("SingerPipelineExtension::createPipeline", [&] { return typed->createPipeline(Ds::DiffSingerPipelineRuntimeOptions{}); });
+                    auto created = inference::nativeCall("SingerPipelineExtension::createPipeline", [&] { return typed->createPipeline(Ds::PipelineRuntimeOptions{}); });
                     if (!created) {
                         return std::unexpected{std::move(created.error())};
                     }
                     factory->pipeline = std::move(*created);
                 }
 
-                auto *pipeline = dynamic_cast<Ds::DiffSingerPipelineExecutive *>(factory->pipeline.get());
+                auto *pipeline = dynamic_cast<Ds::PipelineExecutive *>(factory->pipeline.get());
                 if (!pipeline) {
                     return std::unexpected{inference::ExecutionError("Singer provider returned an incompatible pipeline")};
                 }
 
                 switch (stage) {
-                    case SynthesisStage::Duration: return createStage<Du::DurationExecutive, Du::DurationRuntimeOptions, Du::DurationInitArgs>(*pipeline, &Ds::DiffSingerPipelineExecutive::createDuration);
-                    case SynthesisStage::Pitch: return createStage<Pi::PitchExecutive, Pi::PitchRuntimeOptions, Pi::PitchInitArgs>(*pipeline, &Ds::DiffSingerPipelineExecutive::createPitch);
-                    case SynthesisStage::Variance: return createStage<Va::VarianceExecutive, Va::VarianceRuntimeOptions, Va::VarianceInitArgs>(*pipeline, &Ds::DiffSingerPipelineExecutive::createVariance);
-                    case SynthesisStage::Acoustic: return createStage<Ac::AcousticExecutive, Ac::AcousticRuntimeOptions, Ac::AcousticInitArgs>(*pipeline, &Ds::DiffSingerPipelineExecutive::createAcoustic);
-                    case SynthesisStage::Vocoder: return createStage<Vo::VocoderExecutive, Vo::VocoderRuntimeOptions, Vo::VocoderInitArgs>(*pipeline, &Ds::DiffSingerPipelineExecutive::createVocoder);
+                    case SynthesisStage::Duration: return createStage<Du::Executive, Du::RuntimeOptions, Du::InitArgs>(*pipeline, &Ds::PipelineExecutive::createDuration);
+                    case SynthesisStage::Pitch: return createStage<Pi::Executive, Pi::RuntimeOptions, Pi::InitArgs>(*pipeline, &Ds::PipelineExecutive::createPitch);
+                    case SynthesisStage::Variance: return createStage<Va::Executive, Va::RuntimeOptions, Va::InitArgs>(*pipeline, &Ds::PipelineExecutive::createVariance);
+                    case SynthesisStage::Acoustic: return createStage<Ac::Executive, Ac::RuntimeOptions, Ac::InitArgs>(*pipeline, &Ds::PipelineExecutive::createAcoustic);
+                    case SynthesisStage::Vocoder: return createStage<Vo::Executive, Vo::RuntimeOptions, Vo::InitArgs>(*pipeline, &Ds::PipelineExecutive::createVocoder);
                 }
                 std::unreachable();
             };
@@ -179,18 +184,18 @@ namespace dssp::arch_diffsinger {
         }
 
         switch (stage) {
-            case SynthesisStage::Duration: return validateWords<Du::DurationConfiguration>(found->second, words, name, locale);
-            case SynthesisStage::Pitch: return validateWords<Pi::PitchConfiguration>(found->second, words, name, locale);
-            case SynthesisStage::Variance: return validateWords<Va::VarianceConfiguration>(found->second, words, name, locale);
-            case SynthesisStage::Acoustic: return validateWords<Ac::AcousticConfiguration>(found->second, words, name, locale);
+            case SynthesisStage::Duration: return validateWords<Du::Onnx::Configuration>(found->second, words, name, locale);
+            case SynthesisStage::Pitch: return validateWords<Pi::Onnx::Configuration>(found->second, words, name, locale);
+            case SynthesisStage::Variance: return validateWords<Va::Onnx::Configuration>(found->second, words, name, locale);
+            case SynthesisStage::Acoustic: return validateWords<Ac::Onnx::Configuration>(found->second, words, name, locale);
             case SynthesisStage::Vocoder: return {};
         }
         std::unreachable();
     }
 
     arch::SynthesisResult<void> validateMelConfiguration(const SingerRecord &singer) {
-        const auto *acoustic = dynamic_cast<const Ac::AcousticConfiguration *>(singer.stages.at("acoustic").spec->configuration());
-        const auto *vocoder = dynamic_cast<const Vo::VocoderConfiguration *>(singer.stages.at("vocoder").spec->configuration());
+        const auto *acoustic = dynamic_cast<const Ac::Onnx::Configuration *>(singer.stages.at("acoustic").spec->configuration());
+        const auto *vocoder = dynamic_cast<const Vo::Onnx::Configuration *>(singer.stages.at("vocoder").spec->configuration());
         if (!acoustic || !vocoder || acoustic->sampleRate <= 0 || acoustic->hopSize <= 0 || acoustic->melChannels <= 0) {
             return fail<arch::SynthesisErrors>(arch::OperationError("Singer " + singer.info.id + " has an invalid acoustic/vocoder configuration"));
         }

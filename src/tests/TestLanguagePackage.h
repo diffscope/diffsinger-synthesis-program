@@ -25,15 +25,18 @@ namespace dssp::tests {
         const std::string singerInferences = options.singer ? R"(,{"id":"acoustic","path":"acoustic.json"},{"id":"vocoder","path":"vocoder.json"})" + predictedInferences : "";
         const std::string singerDeclaration = options.singer ? R"(,"singer":[{"id":"main","path":"singer.json"}])" : "";
         files.write(root / "desc.json", R"({"$version":"1.0","id":"example/language","version":")" + options.version + R"(","runtimeLevel":1,"contributions":{
-            "inference":[{"id":"g2p","path":"g2p.json"},{"id":"s2p","path":"s2p.json"})" + onsetDeclaration + singerInferences + R"(],
-            "linguist":[{"id":"eng","path":"eng.json"}])" + singerDeclaration + "}}");
+            "inference":[{"id":"g2p","path":"g2p.json"},{"id":"s2p","path":"s2p.json"})" +
+                                            onsetDeclaration + singerInferences + R"(],
+            "linguist":[{"id":"eng","path":"eng.json"}])" +
+                                            singerDeclaration + "}}");
         files.write(root / "g2p.json", R"({"interface":"org.openvpi.wolf.inference.G2P","variant":"pipe-chain","level":1,
             "exports":{"languages":[{"language":"eng","scheme":"test"}],"symbols":["b","a","i"]},
             "configuration":{"formatVersion":1,"steps":[{"step":"dict","params":{"file":"g2p.tsv"}}]}})");
         files.write(root / "g2p.tsv", "read\tb a b i\nread(2)\tb i\na+\ta+\n-\t-\n");
         const bool dictionary = options.dictionaryS2p || options.missingS2pDictionary;
         files.write(root / "s2p.json", R"({"interface":"org.openvpi.wolf.inference.S2P","variant":")" + std::string(dictionary ? "dict" : "direct") + R"(","level":1,
-            "exports":{"languages":[{"language":"eng","scheme":"test"}],"phonemes":["b","a","i"]},"configuration":)" + (dictionary ? R"({"file":"s2p.tsv"})" : "{}") + "}");
+            "exports":{"languages":[{"language":"eng","scheme":"test"}],"phonemes":["b","a","i"]},"configuration":)" +
+                                           (dictionary ? R"({"file":"s2p.tsv"})" : "{}") + "}");
         if (!options.missingS2pDictionary) {
             files.write(root / "s2p.tsv", "test\tb a b i\n");
         }
@@ -44,7 +47,8 @@ namespace dssp::tests {
         const std::string onsetImport = options.onsets ? R"(,{"role":"linguist/onset","ref":":inference/onset","options":{}})" : "";
         files.write(root / "eng.json", R"({"interface":"org.openvpi.wolf.linguist.WolfLinguist","variant":"wolf","level":1,
             "language":"eng","scheme":"test","name":"English","exports":{"phonemes":["b","a","i"]},"configuration":{},
-            "imports":[{"role":"linguist/g2p","ref":":inference/g2p","options":{}},{"role":"linguist/s2p","ref":":inference/s2p","options":{}})" + onsetImport + "]}");
+            "imports":[{"role":"linguist/g2p","ref":":inference/g2p","options":{}},{"role":"linguist/s2p","ref":":inference/s2p","options":{}})" +
+                                           onsetImport + "]}");
         if (!options.singer) {
             return;
         }
@@ -62,14 +66,18 @@ namespace dssp::tests {
             files.write(root / "variance.json", R"({"interface":"org.openvpi.dsinfer.inference.Variance","variant":"onnx","level":1,
                 "exports":{"predictions":["energy"]},"configuration":{"encoder":"${root}/missing-variance-encoder.onnx","predictor":"${root}/missing-variance-predictor.onnx","frameWidth":0.01,"phonemes":"phonemes.json"}})");
         }
-        // synthrt requires a default language whenever a singer declares languages.
-        const std::string languages = options.singerLanguages ? R"(,"languages":{"eng":"language/eng"},"defaultLanguage":"eng")" : "";
+        // The DiffSinger provider requires a default language whenever the singer declares languages.
+        const std::string languages = options.singerLanguages ? R"("languages":{"eng":"language/eng"},"defaultLanguage":"eng")" : "";
         const std::string languageImport = options.singerLanguages ? R"(,{"role":"language/eng","ref":":linguist/eng","options":{}})" : "";
-        const std::string reserved = options.noReserved ? "" : options.customReserved ? R"(,"reservedPhonemes":["REST"])" : R"(,"reservedPhonemes":["SP","AP"])";
+        const std::string reserved = options.noReserved ? "" : options.customReserved ? R"("reservedPhonemes":["REST"])"
+                                                                                      : R"("reservedPhonemes":["SP","AP"])";
+        const std::string exports = R"("exports":{)" + std::string(languages.empty() ? "" : languages) + std::string(!languages.empty() && !reserved.empty() ? "," : "") + reserved + "}";
         const std::string predictedImports = options.synthesisStages ? R"(,{"role":"singer/duration","ref":":inference/duration","options":{}},{"role":"singer/pitch","ref":":inference/pitch","options":{}},{"role":"singer/variance","ref":":inference/variance","options":{"predictions":["energy"]}})" : "";
         files.write(root / "singer.json", R"({"interface":"org.openvpi.dsinfer.singer.DiffSinger","variant":"openvpi","level":1,
-            "name":"Test singer","configuration":{"dict":"unused-dictionary.txt"})" + languages + reserved + R"(,"imports":[
-            {"role":"singer/acoustic","ref":":inference/acoustic","options":{}},{"role":"singer/vocoder","ref":":inference/vocoder","options":{}})" + languageImport + predictedImports + "]}");
+            "name":"Test singer","configuration":{"dict":"unused-dictionary.txt"},)" +
+                                              exports + R"(,"imports":[
+            {"role":"singer/acoustic","ref":":inference/acoustic","options":{}},{"role":"singer/vocoder","ref":":inference/vocoder","options":{}})" +
+                                              languageImport + predictedImports + "]}");
     }
 }
 

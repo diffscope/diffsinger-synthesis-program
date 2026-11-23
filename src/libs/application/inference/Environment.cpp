@@ -1,13 +1,13 @@
 #include "Environment.h"
 
+#include <onnxruntime_c_api.h>
+
 #include <algorithm>
 #include <exception>
 #include <map>
 #include <mutex>
 #include <set>
 #include <utility>
-
-#include <onnxruntime_c_api.h>
 #if defined(_WIN32) && __has_include(<dml_provider_factory.h>)
 #    include <dml_provider_factory.h>
 #    define DSSP_INFERENCE_HAS_DML
@@ -314,7 +314,7 @@ namespace dssp::inference {
                     log.stdcDebug("ONNX driver directory: %1; runtime library: %2", stdc::path::to_utf8(onnx.driverPath), stdc::path::to_utf8(onnx.runtimePath));
                 }
                 impl->drivers.setPluginPaths(driverPaths);
-                auto *loader = impl->drivers.find(ds::Api::Onnx::API_NAME);
+                auto *loader = impl->drivers.find(ds::Api::Onnx::Contract.name());
                 if (!loader) {
                     return std::unexpected{InitializationError("The ONNX inference driver plugin was not found")};
                 }
@@ -445,7 +445,8 @@ namespace dssp::inference {
 
             if (options.onnx && options.onnx->executionProvider == runtime::ExecutionProvider::DirectML) {
                 auto gate = resource::ExecutionGate::create("dssp-inference/directml");
-                if (!gate) return std::unexpected{InitializationError("Cannot create DirectML execution admission", gate.error().clone())};
+                if (!gate)
+                    return std::unexpected{InitializationError("Cannot create DirectML execution admission", gate.error().clone())};
                 impl->serialExecution = std::move(*gate);
                 log.stdcInfo("DirectML inference execution is serialized; whitelisted backend-free tasks may run concurrently");
             }
@@ -467,9 +468,13 @@ namespace dssp::inference {
 
     Environment::Environment(std::unique_ptr<Impl> impl) : m_impl(std::move(impl)) {}
 
-    Environment::~Environment() { shutdown(); }
+    Environment::~Environment() {
+        shutdown();
+    }
 
-    srt::SynthUnit &Environment::unit() const noexcept { return m_impl->unit; }
+    srt::SynthUnit &Environment::unit() const noexcept {
+        return m_impl->unit;
+    }
 
     std::expected<InferencePool *, InitializationError> Environment::inferences(std::string_view group) {
         const std::lock_guard lock(m_impl->poolsMutex);
@@ -499,16 +504,20 @@ namespace dssp::inference {
                 m_impl->stopped = true;
             }
 
-            if (m_impl->serialExecution) m_impl->serialExecution->close();
+            if (m_impl->serialExecution)
+                m_impl->serialExecution->close();
             for (const auto &[group, pool] : m_impl->pools) {
                 pool->shutdown();
             }
 
-            if (m_impl->serialExecution) m_impl->serialExecution->shutdown();
+            if (m_impl->serialExecution)
+                m_impl->serialExecution->shutdown();
         });
     }
 
-    const std::vector<srt::PackageHandle> &Environment::packages() const noexcept { return m_impl->packages; }
+    const std::vector<srt::PackageHandle> &Environment::packages() const noexcept {
+        return m_impl->packages;
+    }
 
     const std::string *Environment::packageHash(const srt::PackageHandle &package) const {
         if (!package) {
@@ -521,6 +530,8 @@ namespace dssp::inference {
         return &installed->second.hash;
     }
 
-    const std::vector<PackageProblem> &Environment::problems() const noexcept { return m_impl->problems; }
+    const std::vector<PackageProblem> &Environment::problems() const noexcept {
+        return m_impl->problems;
+    }
 
 }

@@ -4,23 +4,21 @@
 
 #include <srtsepinfer/Api/Separation/1/SeparationApiL1.h>
 #include <srtsepinfer/Separation/Provider/SeparationInterpreter.h>
-#include <synthrt/Support/JSON.h>
+#include <synthrt/Support/Json.h>
 
 namespace srtsepinfer {
     srt::Expected<std::unique_ptr<srt::ContribImportOptions>> SeparationInterpreter::createImportOptions(const srt::ContribSpec &target, const srt::JsonValue &options) const {
         if (!options.isNull() && (!options.isObject() || !options.toObject().empty()))
             return srt::Error(srt::Error::InvalidFormat, "Separation Level 1 defines no import options");
 
-        return std::unique_ptr<srt::ContribImportOptions>(new Api::Separation::L1::SeparationImportOptions(target.variant()));
+        return std::unique_ptr<srt::ContribImportOptions>(new Api::Separation::L1::SeparationImportOptions());
     }
 }
 
 namespace srtsepinfer::Api::Separation::L1 {
-    SeparationSchema::SeparationSchema(std::string variant) : ContribExports(API_INTERFACE, std::move(variant), API_LEVEL) {}
-
     SeparationSchema::~SeparationSchema() = default;
 
-    SeparationExecutive::SeparationExecutive(srt::InferenceSpec &spec) : InferenceExecutive(spec), m_task([this](const SeparationStartInput &input) { return run(input); }) {}
+    SeparationExecutive::SeparationExecutive(srt::InferenceSpec &spec) : InferenceExecutive(spec), m_task([this](const SeparationStartInput &input, const srt::TaskStopToken &token) { return run(input, token); }) {}
 
     SeparationExecutive::~SeparationExecutive() {
         (void)stop();
@@ -28,10 +26,10 @@ namespace srtsepinfer::Api::Separation::L1 {
     }
 
     srt::Expected<std::unique_ptr<SeparationExecutive>> createSeparator(srt::InferenceSpec &spec) {
-        if (spec.interfaceId() != API_INTERFACE || spec.level() != API_LEVEL)
+        if (spec.triplet().contract() != Contract)
             return srt::Error(SeparationError::ContractViolation, "Expected a Separation Level 1 inference");
 
-        auto made = spec.createInference(SeparationImportOptions(spec.variant()), SeparationRuntimeOptions(spec.variant()));
+        auto made = spec.createInference(SeparationImportOptions(), SeparationRuntimeOptions());
         if (!made)
             return made.takeError();
 
@@ -44,7 +42,7 @@ namespace srtsepinfer::Api::Separation::L1 {
         return std::unique_ptr<SeparationExecutive>(typed);
     }
 
-    srt::Expected<std::unique_ptr<SeparationSchema>> readSeparationSchema(const srt::ContribSpec &spec, std::string variant) {
+    srt::Expected<std::unique_ptr<SeparationSchema>> readSeparationSchema(const srt::ContribSpec &spec) {
         if (!spec.manifestExports().isObject())
             return srt::Error(srt::Error::InvalidFormat, "Separation exports must be an object");
 
@@ -54,7 +52,7 @@ namespace srtsepinfer::Api::Separation::L1 {
                 return srt::Error(srt::Error::InvalidFormat, "Unknown Separation exports field: " + key);
         }
 
-        auto result = std::make_unique<SeparationSchema>(std::move(variant));
+        auto result = std::make_unique<SeparationSchema>();
         for (const auto &[key, member] : {std::pair{"sampleRate", &result->sampleRate}, std::pair{"channelCount", &result->channelCount}}) {
             const auto it = object.find(key);
             if (it == object.end() || !it->second.isNumber())

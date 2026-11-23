@@ -315,8 +315,8 @@ namespace dssp::tests {
     }
 
     TEST(LanguageResults, ExpectedWordFailuresFallbackButRuntimeFailuresKeepNativeDiagnostics) {
-        using Error = wolf::Api::G2P::L1::Error;
-        wolf::Api::G2P::L1::G2PWordOutput word;
+        using Error = wolf::Api::G2p::L1::Error;
+        wolf::Api::G2p::L1::WordOutput word;
         for (const auto error : {Error::InvalidInput, Error::PhonemeGenerationFailed}) {
             word.error = error;
             word.pronunciation = "undefined";
@@ -337,8 +337,8 @@ namespace dssp::tests {
     }
 
     TEST(LanguageResults, CandidateFragmentsCollapseAndCopySkipFollowWolfContract) {
-        namespace G2P = wolf::Api::G2P::L1;
-        G2P::G2PWordOutput word;
+        namespace G2P = wolf::Api::G2p::L1;
+        G2P::WordOutput word;
         word.pronunciation = "b a";
         word.candidates = {" b ", "a", ""};
         const auto normalized = arch_diffsinger::translatePronunciation(word, "lyric");

@@ -1,14 +1,16 @@
 #ifndef SRTBEATINFER_BEATAPIL1_H
 #define SRTBEATINFER_BEATAPIL1_H
 
+#include <functional>
+#include <memory>
 #include <vector>
 
 #include <srtbeatinfer/Beat/Provider/BeatTask.h>
 #include <synthrt/SVS/InferenceContrib.h>
 
 namespace srtbeatinfer::Api::Beat::L1 {
-    inline constexpr char API_INTERFACE[] = "org.openvpi.srtbeatinfer.inference.Beat";
-    inline constexpr int API_LEVEL = 1;
+    /// Identifies the beat contract.
+    inline const srt::ContribContract Contract{"org.openvpi.srtbeatinfer.inference.Beat", 1};
 
     /// Finite, interleaved float32 PCM. Hosts decode and resample before calling.
     struct AudioSegment {
@@ -20,7 +22,7 @@ namespace srtbeatinfer::Api::Beat::L1 {
 
     class SRTBEATINFER_EXPORT BeatSchema : public srt::ContribExports {
     public:
-        explicit BeatSchema(std::string variant);
+        BeatSchema() : ContribExports(Contract) {}
         ~BeatSchema() override;
 
         int sampleRate = 0;
@@ -29,24 +31,24 @@ namespace srtbeatinfer::Api::Beat::L1 {
         bool downbeats = false; // Can identify the first beat of a measure.
     };
 
-    SRTBEATINFER_EXPORT srt::Expected<std::unique_ptr<BeatSchema>> readBeatSchema(const srt::ContribSpec &, std::string variant);
+    SRTBEATINFER_EXPORT srt::Expected<std::unique_ptr<BeatSchema>>
+    readBeatSchema(const srt::ContribSpec &spec);
 
     class BeatImportOptions : public srt::ContribImportOptions {
     public:
-        explicit BeatImportOptions(std::string variant) : ContribImportOptions(API_INTERFACE, std::move(variant), API_LEVEL) {}
+        BeatImportOptions() : ContribImportOptions(Contract) {}
     };
 
     class BeatRuntimeOptions : public srt::InferenceRuntimeOptions {
     public:
-        explicit BeatRuntimeOptions(std::string variant) : InferenceRuntimeOptions(API_INTERFACE, std::move(variant), API_LEVEL) {}
+        BeatRuntimeOptions() : InferenceRuntimeOptions(Contract) {}
     };
 
     class BeatStartInput : public srt::TaskStartInput {
     public:
-        static constexpr const char *API_INTERFACE = L1::API_INTERFACE;
-        static constexpr int API_LEVEL = L1::API_LEVEL;
+        inline static const auto &Contract = L1::Contract;
 
-        BeatStartInput() : TaskStartInput(API_INTERFACE, API_LEVEL) {}
+        BeatStartInput() : TaskStartInput(Contract) {}
 
         AudioSegment audio;
         // Reports completed inference blocks in [0,1] after feature computation.
@@ -61,10 +63,9 @@ namespace srtbeatinfer::Api::Beat::L1 {
 
     class BeatResult : public srt::TaskResult {
     public:
-        static constexpr const char *API_INTERFACE = L1::API_INTERFACE;
-        static constexpr int API_LEVEL = L1::API_LEVEL;
+        inline static const auto &Contract = L1::Contract;
 
-        BeatResult() : TaskResult(API_INTERFACE, API_LEVEL) {}
+        BeatResult() : TaskResult(Contract) {}
 
         std::vector<Beat> beats; // Strictly increasing times within the input; may be empty.
     };
@@ -74,24 +75,37 @@ namespace srtbeatinfer::Api::Beat::L1 {
         using AsyncCallback = std::function<void(srt::Expected<std::unique_ptr<BeatResult>>)>;
         ~BeatExecutive() override;
 
-        srt::Expected<std::unique_ptr<BeatResult>> start(const BeatStartInput &input) { return m_task.run(input); }
-        srt::Expected<void> startAsync(std::shared_ptr<const BeatStartInput> input, AsyncCallback callback) { return m_task.runAsync(std::move(input), std::move(callback)); }
+        srt::Expected<std::unique_ptr<BeatResult>> start(const BeatStartInput &input) {
+            return m_task.run(input);
+        }
+        srt::Expected<void> startAsync(std::shared_ptr<const BeatStartInput> input,
+            AsyncCallback callback) {
+            return m_task.runAsync(std::move(input), std::move(callback));
+        }
 
-        srt::ITask::State state() const noexcept override { return m_task.state(); }
-        srt::Expected<void> stop() override { return m_task.stop(); }
-        srt::Expected<void> waitForFinished() override { return m_task.waitForFinished(); }
+        srt::ITask::State state() const noexcept override {
+            return m_task.state();
+        }
 
     protected:
-        explicit BeatExecutive(srt::InferenceSpec &);
-        virtual srt::Expected<std::unique_ptr<BeatResult>> run(const BeatStartInput &) = 0;
-        bool cancelled() const noexcept { return m_task.cancelled(); }
+        explicit BeatExecutive(srt::InferenceSpec &spec);
+        virtual srt::Expected<std::unique_ptr<BeatResult>>
+        run(const BeatStartInput &input, const srt::TaskStopToken &token) = 0;
+
+        srt::Expected<void> quit() override {
+            return m_task.stop();
+        }
+        srt::Expected<void> wait() override {
+            return m_task.waitForFinished();
+        }
 
     private:
         // Providers stop and wait before destroying members accessed by run().
         BeatTask<BeatStartInput, BeatResult> m_task;
     };
 
-    SRTBEATINFER_EXPORT srt::Expected<std::unique_ptr<BeatExecutive>> createBeatTracker(srt::InferenceSpec &);
+    SRTBEATINFER_EXPORT srt::Expected<std::unique_ptr<BeatExecutive>>
+    createBeatTracker(srt::InferenceSpec &spec);
 }
 
 #endif

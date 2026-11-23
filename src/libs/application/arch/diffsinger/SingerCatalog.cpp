@@ -6,11 +6,17 @@
 #include <string>
 #include <utility>
 
+#include <dsinfer/Api/Inferences/Acoustic/1/AcousticOnnxApiL1.h>
+#include <dsinfer/Api/Inferences/Duration/1/DurationOnnxApiL1.h>
+#include <dsinfer/Api/Inferences/Pitch/1/PitchOnnxApiL1.h>
+#include <dsinfer/Api/Inferences/Variance/1/VarianceOnnxApiL1.h>
+#include <dsinfer/Api/Inferences/Vocoder/1/VocoderOnnxApiL1.h>
 #include <dsinfer/Api/Singers/DiffSinger/1/DiffSingerApiL1.h>
+#include <dsinfer/Api/Singers/DiffSinger/1/DiffSingerOpenVpiApiL1.h>
 #include <stdcorelib/support/logging.h>
 #include <synthrt/Core/ContribImportBinding.h>
-#include <wolf/Linguist/LinguistContrib.h>
 #include <wolf/Api/Linguists/Linguist/1/LinguistApiL1.h>
+#include <wolf/Linguist/LinguistContrib.h>
 
 #include <dssparchdiffsinger/Factory.h>
 #include <dssparchdiffsinger/SingerMetadata.h>
@@ -47,7 +53,7 @@ namespace dssp::arch_diffsinger {
             const auto *schema = dynamic_cast<const Schema *>(target.exports());
             const auto *configuration = dynamic_cast<const Configuration *>(target.configuration());
             const auto *options = dynamic_cast<const Options *>(imported->options());
-            if (!schema || !configuration || !options || target.interfaceId() != schema->interfaceId() || target.variant() != schema->variant() || target.level() != schema->level()) {
+            if (!schema || !configuration || !options || target.triplet().contract() != schema->contract()) {
                 return std::unexpected{inference::ResourceError("Unsupported typed stage contract for " + std::string(role))};
             }
 
@@ -96,23 +102,27 @@ namespace dssp::arch_diffsinger {
         }
 
         std::expected<std::pair<SingerRecord, GroupRecord>, inference::ResourceError> readSinger(const srt::SingerSpec &singer) {
-            if (!srt::ContribSpecExtension::findFromSpec<Ds::DiffSingerPipelineExecutive>(singer)) {
+            if (!srt::ContribSpecExtension::findFromSpec<Ds::PipelineExecutive>(singer)) {
                 return std::unexpected{inference::ResourceError("The DiffSinger pipeline provider is unavailable")};
             }
 
-            if (!dynamic_cast<const Ds::DiffSingerConfiguration *>(singer.configuration())) {
+            if (!dynamic_cast<const Ds::OpenVpi::Configuration *>(singer.configuration())) {
                 return std::unexpected{inference::ResourceError("The DiffSinger configuration is unavailable")};
+            }
+            const auto *singerExports = dynamic_cast<const Ds::Exports *>(singer.exports());
+            if (!singerExports) {
+                return std::unexpected{inference::ResourceError("The DiffSinger singer exports are unavailable")};
             }
             auto metadata = singerMetadata(singer.manifestConfiguration());
             if (!metadata) {
                 return std::unexpected{std::move(metadata.error())};
             }
 
-            auto duration = readStage<Du::DurationSchema, Du::DurationConfiguration, Du::DurationImportOptions>(singer, "singer/duration", false);
-            auto pitch = readStage<Pi::PitchSchema, Pi::PitchConfiguration, Pi::PitchImportOptions>(singer, "singer/pitch", false);
-            auto variance = readStage<Va::VarianceSchema, Va::VarianceConfiguration, Va::VarianceImportOptions>(singer, "singer/variance", false);
-            auto acoustic = readStage<Ac::AcousticSchema, Ac::AcousticConfiguration, Ac::AcousticImportOptions>(singer, "singer/acoustic", true);
-            auto vocoder = readStage<Vo::VocoderSchema, Vo::VocoderConfiguration, Vo::VocoderImportOptions>(singer, "singer/vocoder", true);
+            auto duration = readStage<Du::Exports, Du::Onnx::Configuration, Du::ImportOptions>(singer, "singer/duration", false);
+            auto pitch = readStage<Pi::Exports, Pi::Onnx::Configuration, Pi::ImportOptions>(singer, "singer/pitch", false);
+            auto variance = readStage<Va::Exports, Va::Onnx::Configuration, Va::ImportOptions>(singer, "singer/variance", false);
+            auto acoustic = readStage<Ac::Exports, Ac::Onnx::Configuration, Ac::ImportOptions>(singer, "singer/acoustic", true);
+            auto vocoder = readStage<Vo::Exports, Vo::Onnx::Configuration, Vo::ImportOptions>(singer, "singer/vocoder", true);
             for (const auto *stage : {&duration, &pitch, &variance, &acoustic, &vocoder}) {
                 if (!*stage) {
                     return std::unexpected{stage->error()};
@@ -122,7 +132,7 @@ namespace dssp::arch_diffsinger {
             SingerRecord record;
             record.package = singer.package();
             record.spec = &singer;
-            record.reservedPhonemes = singer.reservedPhonemes();
+            record.reservedPhonemes = singerExports->reservedPhonemes;
             record.info.id = inference::resourceReference(singer);
             record.info.arch = Id;
             record.name = singer.name();
@@ -164,14 +174,14 @@ namespace dssp::arch_diffsinger {
             group.archSpecificInfo = Json::Value(Json::objectValue);
             bool completeLanguagePipeline = false;
             std::map<std::string, Depth> languageDepths;
-            completeLanguagePipeline = !singer.languages().empty();
-            for (const auto &[handle, role] : singer.languages()) {
+            completeLanguagePipeline = !singerExports->languages.empty();
+            for (const auto &[handle, role] : singerExports->languages) {
                 auto route = inference::readLanguageRoute(singer, handle);
                 if (!route) {
                     return std::unexpected{std::move(route.error())};
                 }
 
-                const auto *exports = dynamic_cast<const wolf::Api::Linguist::L1::LinguistExports *>(route->spec->exports());
+                const auto *exports = dynamic_cast<const wolf::Api::Linguist::L1::Exports *>(route->spec->exports());
                 if (!exports) {
                     return std::unexpected{inference::ResourceError("Missing linguist exports for " + handle)};
                 }
@@ -181,10 +191,7 @@ namespace dssp::arch_diffsinger {
                 const auto accepted = [&](const std::string &token) {
                     // DiffSinger resolves language-qualified tokens before falling back to bare tokens in each stage.
                     const auto qualified = handle.empty() || token == "SP" || token == "AP" ? token : handle + '/' + token;
-                    return acceptsPhoneme<Du::DurationConfiguration>(*duration, token, qualified)
-                        && acceptsPhoneme<Pi::PitchConfiguration>(*pitch, token, qualified)
-                        && acceptsPhoneme<Va::VarianceConfiguration>(*variance, token, qualified)
-                        && acceptsPhoneme<Ac::AcousticConfiguration>(*acoustic, token, qualified);
+                    return acceptsPhoneme<Du::Onnx::Configuration>(*duration, token, qualified) && acceptsPhoneme<Pi::Onnx::Configuration>(*pitch, token, qualified) && acceptsPhoneme<Va::Onnx::Configuration>(*variance, token, qualified) && acceptsPhoneme<Ac::Onnx::Configuration>(*acoustic, token, qualified);
                 };
                 if (!exports->openSet && !exports->phonemes.empty() && std::ranges::none_of(exports->phonemes, accepted)) {
                     log.stdcWarning("Singer %1 language %2 has no phonemes accepted by its synthesis stages", record.info.id, handle);
@@ -195,7 +202,8 @@ namespace dssp::arch_diffsinger {
                 log.stdcTrace("Singer %1 language %2 supports depth %3", record.info.id, handle, depthName(route->depth));
                 completeLanguagePipeline = completeLanguagePipeline && route->depth == Depth::Onsets;
                 auto metadata = inference::languageMetadata(*route->spec);
-                const auto phonemeMode = route->depth == Depth::Onsets ? arch::PhonemeMode::Full : route->depth == Depth::Phonemes ? arch::PhonemeMode::TokenOnly : arch::PhonemeMode::Skip;
+                const auto phonemeMode = route->depth == Depth::Onsets ? arch::PhonemeMode::Full : route->depth == Depth::Phonemes ? arch::PhonemeMode::TokenOnly
+                                                                                                                                   : arch::PhonemeMode::Skip;
                 group.languages.emplace(handle, arch::GroupLanguageInfo{handle, std::move(metadata.defaultLyric), arch::PronunciationMode::Full, phonemeMode});
                 groupRecord.languageNames.emplace(handle, std::move(metadata.name));
                 languageDepths.emplace(handle, route->depth);
@@ -205,17 +213,17 @@ namespace dssp::arch_diffsinger {
             if (group.languages.empty()) {
                 log.stdcDebug("Singer %1 has no usable language declarations; pronunciation and phoneme stages will be skipped", record.info.id);
                 completeLanguagePipeline = false;
-            } else if (!singer.defaultLanguage().empty()) {
-                if (!group.languages.contains(singer.defaultLanguage())) {
-                    return std::unexpected{inference::ResourceError("The declared default language is unavailable: " + singer.defaultLanguage())};
+            } else if (!singerExports->defaultLanguage.empty()) {
+                if (!group.languages.contains(singerExports->defaultLanguage)) {
+                    return std::unexpected{inference::ResourceError("The declared default language is unavailable: " + singerExports->defaultLanguage)};
                 }
 
-                record.info.defaultLanguage = singer.defaultLanguage();
+                record.info.defaultLanguage = singerExports->defaultLanguage;
             }
 
-            const auto *acousticSchema = dynamic_cast<const Ac::AcousticSchema *>(acoustic->spec->exports());
-            const auto *acousticConfiguration = dynamic_cast<const Ac::AcousticConfiguration *>(acoustic->spec->configuration());
-            const auto *vocoderConfiguration = dynamic_cast<const Vo::VocoderConfiguration *>(vocoder->spec->configuration());
+            const auto *acousticSchema = dynamic_cast<const Ac::Exports *>(acoustic->spec->exports());
+            const auto *acousticConfiguration = dynamic_cast<const Ac::Onnx::Configuration *>(acoustic->spec->configuration());
+            const auto *vocoderConfiguration = dynamic_cast<const Vo::Onnx::Configuration *>(vocoder->spec->configuration());
             const auto supported = [&](std::string_view parameter) {
                 const ds::ParamTag tag{std::string(parameter)};
                 return acousticConfiguration->parameters.contains(tag) && (acousticSchema->varianceControls.contains(tag) || acousticSchema->transitionControls.contains(tag));
@@ -223,8 +231,8 @@ namespace dssp::arch_diffsinger {
 
             bool expressiveness = false;
             if (pitch->spec) {
-                const auto *schema = dynamic_cast<const Pi::PitchSchema *>(pitch->spec->exports());
-                const auto *config = dynamic_cast<const Pi::PitchConfiguration *>(pitch->spec->configuration());
+                const auto *schema = dynamic_cast<const Pi::Exports *>(pitch->spec->exports());
+                const auto *config = dynamic_cast<const Pi::Onnx::Configuration *>(pitch->spec->configuration());
                 expressiveness = schema->allowExpressiveness && config->useExpressiveness;
                 group.parameterPipeline.emplace("pitch", arch::IndirectParameter{expressiveness ? std::vector<std::string>{"expressiveness"} : std::vector<std::string>{}, arch::ParameterRetakeMode::Range});
             } else {
@@ -240,8 +248,8 @@ namespace dssp::arch_diffsinger {
                 effectiveOptions.emplace(role, srt::JsonObject{});
             }
             if (variance->spec) {
-                const auto *schema = dynamic_cast<const Va::VarianceSchema *>(variance->spec->exports());
-                const auto *options = dynamic_cast<const Va::VarianceImportOptions *>(variance->options);
+                const auto *schema = dynamic_cast<const Va::Exports *>(variance->spec->exports());
+                const auto *options = dynamic_cast<const Va::ImportOptions *>(variance->options);
                 if (options->predictions.empty()) {
                     return std::unexpected{inference::ResourceError("The variance import must select a nonempty prediction subset")};
                 }
@@ -286,7 +294,7 @@ namespace dssp::arch_diffsinger {
             // resolved versions and recursive resources; public speaker selection
             // and host permissions do not alter this pipeline identity.
             std::map<std::string, std::string> roleNames;
-            for (const auto &[handle, role] : singer.languages()) {
+            for (const auto &[handle, role] : singerExports->languages) {
                 roleNames.emplace(role, "language/" + handle);
                 effectiveOptions.emplace(role, srt::JsonObject{});
             }
@@ -296,7 +304,7 @@ namespace dssp::arch_diffsinger {
             const auto description = srt::JsonValue(srt::JsonObject{{"pipeline", inference::describeImports(singer, effectiveOptions, roleNames)}, {"reservedPhonemes", srt::JsonArray{}}});
             auto identity = description.toObject();
             srt::JsonArray reserved;
-            const std::set<std::string> reservedTokens(singer.reservedPhonemes().begin(), singer.reservedPhonemes().end());
+            const std::set<std::string> reservedTokens(singerExports->reservedPhonemes.begin(), singerExports->reservedPhonemes.end());
             for (const auto &token : reservedTokens) {
                 reserved.push_back(token);
             }
@@ -391,7 +399,7 @@ namespace dssp::arch_diffsinger {
             std::size_t skipped = 0;
             for (const auto &package : catalog->m_environment->packages()) {
                 for (const auto *contribution : package.contributions("singer")) {
-                    if (contribution->interfaceId() != Ds::API_INTERFACE || contribution->variant() != Ds::API_VARIANT || contribution->level() != Ds::API_LEVEL) {
+                    if (contribution->triplet() != Ds::OpenVpi::Triplet) {
                         log.stdcTrace("Ignoring singer contribution %1 in package %2 with a different architecture contract", contribution->locator().contributionId(), package.id());
                         continue;
                     }

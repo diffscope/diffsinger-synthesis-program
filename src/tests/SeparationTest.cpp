@@ -1,7 +1,7 @@
 #include "DemucsSpectralReference.h"
 #include "SpectralTransform.h"
-#include "TestFiles.h"
 #include "TestCoroutine.h"
+#include "TestFiles.h"
 
 #include <dr_wav.h>
 
@@ -15,8 +15,8 @@
 #include <json/writer.h>
 #include <synthrt/Core/SynthUnit.h>
 
-#include <dsspapiv1/ExtractionMapping.h>
 #include <dsspapiv1/Controllers.h>
+#include <dsspapiv1/ExtractionMapping.h>
 #include <dsspapiv1/ResponseCodec.h>
 #include <dsspcodecutil/codecutil.h>
 #include <dsspextraction/SeparationTypes.h>
@@ -61,7 +61,7 @@ namespace dssp::tests {
         Json::Value mappedDeclaration(const std::vector<std::string> &modelTracks, const std::vector<std::pair<std::string, std::string>> &tracks) {
             Json::Value declaration;
             declaration["name"] = "Mapped Demucs";
-            declaration["interface"] = Sep::API_INTERFACE;
+            declaration["interface"] = Sep::Contract.interfaceId();
             declaration["variant"] = "demucs";
             declaration["level"] = 1;
 
@@ -109,13 +109,14 @@ namespace dssp::tests {
             }
 
         protected:
-            srt::Expected<std::unique_ptr<Sep::SeparationResult>> run(const Sep::SeparationStartInput &input) override {
+            srt::Expected<std::unique_ptr<Sep::SeparationResult>>
+            run(const Sep::SeparationStartInput &input, const srt::TaskStopToken &token) override {
                 if (m_started) {
                     m_started->set_value();
                     const auto deadline = std::chrono::steady_clock::now() + 3s;
-                    while (!cancelled() && std::chrono::steady_clock::now() < deadline)
+                    while (!token.stopRequested() && std::chrono::steady_clock::now() < deadline)
                         std::this_thread::sleep_for(1ms);
-                    if (cancelled())
+                    if (token.stopRequested())
                         return srtsepinfer::cancelledError();
                     return srt::Error(srtsepinfer::SeparationError::Internal, "Native cancellation did not arrive");
                 }
@@ -421,19 +422,19 @@ namespace dssp::tests {
             auto declaration = valid;
             auto &config = declaration["configuration"];
             switch (variant) {
-            case 0: config.removeMember("modelTracks"); break;
-            case 1: config.removeMember("trackMapping"); break;
-            case 2: config["trackMapping"].removeMember("lead"); break;
-            case 3: config["trackMapping"]["unknown"] = "bass"; break;
-            case 4: config["trackMapping"]["lead"] = "piano"; break;
-            case 5: config["trackMapping"]["lead"] = 3; break;
-            case 6: config["trackMapping"] = Json::Value(Json::arrayValue); break;
-            case 7: config["modelTracks"][0] = "vocals"; break;
-            case 8: config["modelTracks"][0] = 0; break;
-            case 9:
-                config.removeMember("modelTracks");
-                config.removeMember("trackMapping");
-                break;
+                case 0: config.removeMember("modelTracks"); break;
+                case 1: config.removeMember("trackMapping"); break;
+                case 2: config["trackMapping"].removeMember("lead"); break;
+                case 3: config["trackMapping"]["unknown"] = "bass"; break;
+                case 4: config["trackMapping"]["lead"] = "piano"; break;
+                case 5: config["trackMapping"]["lead"] = 3; break;
+                case 6: config["trackMapping"] = Json::Value(Json::arrayValue); break;
+                case 7: config["modelTracks"][0] = "vocals"; break;
+                case 8: config["modelTracks"][0] = 0; break;
+                case 9:
+                    config.removeMember("modelTracks");
+                    config.removeMember("trackMapping");
+                    break;
             }
 
             TestFiles files;

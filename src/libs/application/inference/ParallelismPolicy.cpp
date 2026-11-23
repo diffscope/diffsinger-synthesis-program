@@ -11,20 +11,21 @@ namespace dssp::inference {
     namespace {
         // These implementations do not invoke the ONNX driver. Exact matches
         // prevent a future implementation or contract level bypassing the gate.
-        constexpr auto parallelLeaves = std::to_array<std::tuple<std::string_view, int, std::string_view>>({
-            {"org.openvpi.wolf.inference.G2P", 1, "algo-pinyin"},
+        constexpr auto parallelLeaves = std::to_array<std::tuple<std::string_view, int, std::string_view>>({{"org.openvpi.wolf.inference.G2P", 1, "algo-pinyin"},
             {"org.openvpi.wolf.inference.S2P", 1, "direct"},
             {"org.openvpi.wolf.inference.S2P", 1, "dict"},
             {"org.openvpi.wolf.inference.S2P", 1, "mapping"},
             {"org.openvpi.wolf.inference.S2P", 1, "lua"},
             {"org.openvpi.wolf.inference.Onset", 1, "rule"},
-            {"org.openvpi.wolf.inference.Onset", 1, "lua"}
-        });
+            {"org.openvpi.wolf.inference.Onset", 1, "lua"}});
 
         bool inspect(const srt::ContribSpec &spec, std::set<const srt::ContribSpec *> &visiting) {
-            const bool composite = spec.interfaceId() == "org.openvpi.wolf.inference.G2P" && spec.level() == 1 && spec.variant() == "pipe-chain";
-            if (!composite && !isParallelLeaf(spec.interfaceId(), spec.level(), spec.variant())) return false;
-            if (!visiting.insert(&spec).second) return false;
+            const auto &triplet = spec.triplet();
+            const bool composite = triplet.interfaceId() == "org.openvpi.wolf.inference.G2P" && triplet.level() == 1 && triplet.variant() == "pipe-chain";
+            if (!composite && !isParallelLeaf(triplet.interfaceId(), triplet.level(), triplet.variant()))
+                return false;
+            if (!visiting.insert(&spec).second)
+                return false;
             for (const auto &imported : spec.imports()) {
                 const auto *binding = imported.binding();
                 if (!binding || binding->state() != srt::ContribImportBinding::Active || !inspect(binding->target(), visiting)) {

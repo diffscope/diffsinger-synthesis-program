@@ -1,8 +1,9 @@
-#include "BeatFeatures.h"
 #include "BeatFeatureReference.h"
+#include "BeatFeatures.h"
 #include "TestFiles.h"
 
 #include <dr_wav.h>
+
 #include <chrono>
 #include <cmath>
 #include <future>
@@ -15,8 +16,8 @@
 #include <dsspapiv1/ExtractionMapping.h>
 #include <dsspapiv1/ResponseCodec.h>
 #include <dsspcodecutil/codecutil.h>
-#include <dsspextraction/Service.h>
 #include <dsspextraction/BeatTypes.h>
+#include <dsspextraction/Service.h>
 #include <dsspinference/ResourceIdentity.h>
 
 namespace dssp::tests {
@@ -28,7 +29,8 @@ namespace dssp::tests {
 
         std::string wave(int rate = 22050, int channels = 2) {
             std::vector<float> samples(rate * channels);
-            for (std::size_t i = 0; i < samples.size(); ++i) samples[i] = i % channels == 0 ? 0.25f : -0.125f;
+            for (std::size_t i = 0; i < samples.size(); ++i)
+                samples[i] = i % channels == 0 ? 0.25f : -0.125f;
 
             const drwav_data_format format{drwav_container_riff, DR_WAVE_FORMAT_IEEE_FLOAT, static_cast<drwav_uint32>(channels), static_cast<drwav_uint32>(rate), 32};
             void *bytes = nullptr;
@@ -54,7 +56,8 @@ namespace dssp::tests {
             }
 
         protected:
-            srt::Expected<std::unique_ptr<Beat::BeatResult>> run(const Beat::BeatStartInput &input) override {
+            srt::Expected<std::unique_ptr<Beat::BeatResult>>
+            run(const Beat::BeatStartInput &input, const srt::TaskStopToken &token) override {
                 EXPECT_EQ(input.audio.channelCount, 1);
                 EXPECT_EQ(input.audio.sampleRate, 22050);
                 EXPECT_EQ(input.audio.samples.size(), 22050);
@@ -64,17 +67,23 @@ namespace dssp::tests {
                 if (m_started) {
                     m_started->set_value();
                     const auto deadline = std::chrono::steady_clock::now() + 3s;
-                    while (!cancelled() && std::chrono::steady_clock::now() < deadline) std::this_thread::sleep_for(1ms);
-                    if (cancelled()) return srtbeatinfer::cancelledError();
+                    while (!token.stopRequested() && std::chrono::steady_clock::now() < deadline)
+                        std::this_thread::sleep_for(1ms);
+                    if (token.stopRequested())
+                        return srtbeatinfer::cancelledError();
                     return srt::Error(srtbeatinfer::BeatError::Internal, "Native cancellation did not arrive");
                 }
 
                 auto result = std::make_unique<Beat::BeatResult>();
                 result->beats = {{0.25, true}, {0.75, false}};
-                if (m_mode == 1) result->beats[1].time = 0.1;
-                if (m_mode == 2) result->beats[1].time = std::numeric_limits<double>::quiet_NaN();
-                if (m_mode == 3) result->beats[1].time = 1.1;
-                if (m_mode == 4) result->beats.clear();
+                if (m_mode == 1)
+                    result->beats[1].time = 0.1;
+                if (m_mode == 2)
+                    result->beats[1].time = std::numeric_limits<double>::quiet_NaN();
+                if (m_mode == 3)
+                    result->beats[1].time = 1.1;
+                if (m_mode == 4)
+                    result->beats.clear();
 
                 return result;
             }
@@ -101,8 +110,10 @@ namespace dssp::tests {
         }
 
         void TearDown() override {
-            if (m_service) m_service->shutdown();
-            if (m_environment) m_environment->shutdown();
+            if (m_service)
+                m_service->shutdown();
+            if (m_environment)
+                m_environment->shutdown();
         }
 
         void start(int mode = 0, std::shared_ptr<std::promise<void>> started = {}, bool install = true) {
@@ -248,7 +259,8 @@ namespace dssp::tests {
         auto result = features.compute(beatReferenceAudio());
         ASSERT_TRUE(result);
         ASSERT_EQ(result->size(), 5 * 128);
-        for (const auto &[index, value] : BeatReferenceProbes) EXPECT_NEAR((*result)[index], value, 0.00015) << index;
+        for (const auto &[index, value] : BeatReferenceProbes)
+            EXPECT_NEAR((*result)[index], value, 0.00015) << index;
     }
 
     TEST(BeatFeatures, HandlesSilenceVeryShortClipsAndCancellation) {
@@ -256,7 +268,8 @@ namespace dssp::tests {
         auto result = features.compute(std::vector<float>(1, 0));
         ASSERT_TRUE(result);
         EXPECT_EQ(result->size(), 128);
-        for (const auto value : *result) EXPECT_EQ(value, 0);
+        for (const auto value : *result)
+            EXPECT_EQ(value, 0);
 
         EXPECT_FALSE(features.compute(std::vector<float>(1000, 0), [] { return true; }));
     }

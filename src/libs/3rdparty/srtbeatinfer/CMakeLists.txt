@@ -4,7 +4,7 @@ find_package(stdcorelib CONFIG REQUIRED)
 
 include(GenerateExportHeader)
 
-add_library(srtbeatinfer SHARED src/BeatApiL1.cpp src/BeatError.cpp src/BeatTask.cpp)
+add_library(srtbeatinfer SHARED src/BeatApiL1.cpp src/BeatError.cpp)
 add_library(srtbeatinfer::srtbeatinfer ALIAS srtbeatinfer)
 
 target_compile_features(srtbeatinfer PUBLIC cxx_std_23)

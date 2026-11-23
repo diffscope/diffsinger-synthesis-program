@@ -8,9 +8,9 @@
 
 #include <stdcorelib/support/logging.h>
 #include <synthrt/Core/ContribImportBinding.h>
-#include <wolf/Api/Inferences/G2P/1/G2PApiL1.h>
+#include <wolf/Api/Inferences/G2p/1/G2pApiL1.h>
 #include <wolf/Api/Inferences/Onset/1/OnsetApiL1.h>
-#include <wolf/Api/Inferences/S2P/1/S2PApiL1.h>
+#include <wolf/Api/Inferences/S2p/1/S2pApiL1.h>
 
 #include <dssparchdiffsinger/LanguageResults.h>
 #include <dssparchdiffsinger/SynthesisContext.h>
@@ -18,8 +18,8 @@
 
 namespace dssp::arch_diffsinger {
     namespace {
-        namespace G2P = wolf::Api::G2P::L1;
-        namespace S2P = wolf::Api::S2P::L1;
+        namespace G2P = wolf::Api::G2p::L1;
+        namespace S2P = wolf::Api::S2p::L1;
         namespace Onset = wolf::Api::Onset::L1;
         stdc::LogCategory log("dssp.arch_diffsinger.LanguagePrediction");
 
@@ -61,7 +61,7 @@ namespace dssp::arch_diffsinger {
                     return std::unexpected{inference::ExecutionError("Language inference import is not active")};
                 }
 
-                auto options = std::make_shared<RuntimeOptions>(binding->target().variant());
+                auto options = std::make_shared<RuntimeOptions>();
                 srt::JsonObject effective;
                 if constexpr (requires { options->binding; }) {
                     options->binding = route.binding;
@@ -119,7 +119,8 @@ namespace dssp::arch_diffsinger {
                     done = reply.has_value();
                 }
 
-                if (value) progress.advance(*value);
+                if (value)
+                    progress.advance(*value);
                 if (reply) {
                     if (!*reply) {
                         stop.request_stop();
@@ -134,7 +135,7 @@ namespace dssp::arch_diffsinger {
             const inference::LanguageRoute *route;
             inference::InferenceHandle handle;
             std::vector<std::size_t> indices;
-            std::shared_ptr<G2P::G2PStartInput> input = std::make_shared<G2P::G2PStartInput>();
+            std::shared_ptr<G2P::StartInput> input = std::make_shared<G2P::StartInput>();
         };
 
         struct PhonemeTask {
@@ -163,10 +164,10 @@ namespace dssp::arch_diffsinger {
                 co_return;
             }
 
-            auto input = std::make_shared<Onset::OnsetStartInput>();
+            auto input = std::make_shared<Onset::StartInput>();
             input->phonemes.push_back(std::move(tokens));
             const auto handle = task.onset;
-            auto result = co_await pool.runCoro<Onset::OnsetExecutive>(handle, request->stop.get_token(), [input](auto &executive) { return executive.start(*input); }, request->progress);
+            auto result = co_await pool.runCoro<Onset::Executive>(handle, request->stop.get_token(), [input](auto &executive) { return executive.start(*input); }, request->progress);
             if (!result) {
                 request->finish<arch::PhonemeNote>({task.index}, std::unexpected{executionError(result.error())});
             } else if (!*result || (*result)->onsets.size() != 1 || (*result)->onsets[0].size() != input->phonemes[0].size()) {
@@ -219,7 +220,7 @@ namespace dssp::arch_diffsinger {
 
             auto [group, inserted] = groups.emplace(route, batches.size());
             if (inserted) {
-                auto handle = bind<G2P::G2PExecutive, G2P::G2PInitArgs, G2P::G2PRuntimeOptions>(**pool, *route->g2p, *route);
+                auto handle = bind<G2P::Executive, G2P::InitArgs, G2P::RuntimeOptions>(**pool, *route->g2p, *route);
                 if (!handle) {
                     complete(fail<arch::SynthesisErrors>(arch::OperationError("Cannot bind pronunciation inference", handle.error().clone())));
                     return;
@@ -238,13 +239,14 @@ namespace dssp::arch_diffsinger {
         }
 
         std::size_t total = 0;
-        for (const auto &batch : batches) total += batch.indices.size();
+        for (const auto &batch : batches)
+            total += batch.indices.size();
         const auto request = std::make_shared<Request<arch::PronunciationOutput>>(std::move(catalog), stop, std::move(complete), std::move(output), batches.size(), input.progress, total);
         for (auto &batch : batches) {
             const auto nativeInput = batch.input;
             const auto handle = batch.handle;
             drogon::async_run([pool = *pool, request, batch = std::move(batch), nativeInput, handle]() -> drogon::Task<> {
-                auto result = co_await pool->runCoro<G2P::G2PExecutive>(handle, request->stop.get_token(), [nativeInput](auto &executive) { return executive.start(*nativeInput); }, request->progress);
+                auto result = co_await pool->runCoro<G2P::Executive>(handle, request->stop.get_token(), [nativeInput](auto &executive) { return executive.start(*nativeInput); }, request->progress);
                 if (!result) {
                     request->finish<arch::Pronunciation>(batch.indices, std::unexpected{executionError(result.error())});
                     co_return;
@@ -318,7 +320,7 @@ namespace dssp::arch_diffsinger {
                 continue;
             }
 
-            auto s2p = bind<S2P::S2PExecutive, S2P::S2PInitArgs, S2P::S2PRuntimeOptions>(**pool, *route->s2p, *route);
+            auto s2p = bind<S2P::Executive, S2P::InitArgs, S2P::RuntimeOptions>(**pool, *route->s2p, *route);
             if (!s2p) {
                 complete(fail<arch::SynthesisErrors>(arch::OperationError("Cannot bind phoneme inference", s2p.error().clone())));
                 return;
@@ -326,7 +328,7 @@ namespace dssp::arch_diffsinger {
 
             inference::InferenceHandle onset;
             if (route->onset) {
-                auto handle = bind<Onset::OnsetExecutive, Onset::OnsetInitArgs, Onset::OnsetRuntimeOptions>(**onsetPool, *route->onset, *route);
+                auto handle = bind<Onset::Executive, Onset::InitArgs, Onset::RuntimeOptions>(**onsetPool, *route->onset, *route);
                 if (!handle) {
                     complete(fail<arch::SynthesisErrors>(arch::OperationError("Cannot bind onset inference", handle.error().clone())));
                     return;
@@ -344,11 +346,11 @@ namespace dssp::arch_diffsinger {
 
         const auto request = std::make_shared<PhonemeRequest>(std::move(catalog), stop, std::move(complete), std::move(output), tasks.size(), input.progress, tasks.size());
         for (auto &task : tasks) {
-            auto nativeInput = std::make_shared<S2P::S2PStartInput>();
+            auto nativeInput = std::make_shared<S2P::StartInput>();
             nativeInput->pronunciations.push_back(task.note.pronunciation);
             const auto handle = task.s2p;
             drogon::async_run([pool = *pool, onsetPool = *onsetPool, request, task = std::move(task), nativeInput, handle]() mutable -> drogon::Task<> {
-                auto result = co_await pool->runCoro<S2P::S2PExecutive>(handle, request->stop.get_token(), [nativeInput](auto &executive) { return executive.start(*nativeInput); }, request->progress);
+                auto result = co_await pool->runCoro<S2P::Executive>(handle, request->stop.get_token(), [nativeInput](auto &executive) { return executive.start(*nativeInput); }, request->progress);
                 if (!result) {
                     request->finish<arch::PhonemeNote>({task.index}, std::unexpected{executionError(result.error())});
                 } else if (!*result || (*result)->phonemes.size() != 1) {

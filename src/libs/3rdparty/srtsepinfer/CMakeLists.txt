@@ -6,7 +6,7 @@ find_package(pffft CONFIG REQUIRED)
 
 include(GenerateExportHeader)
 
-add_library(srtsepinfer SHARED src/SeparationApiL1.cpp src/SeparationError.cpp src/SeparationTask.cpp)
+add_library(srtsepinfer SHARED src/SeparationApiL1.cpp src/SeparationError.cpp)
 add_library(srtsepinfer::srtsepinfer ALIAS srtsepinfer)
 
 target_compile_features(srtsepinfer PUBLIC cxx_std_23)

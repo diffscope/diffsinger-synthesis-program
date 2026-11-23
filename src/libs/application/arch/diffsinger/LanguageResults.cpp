@@ -7,7 +7,7 @@
 
 namespace dssp::arch_diffsinger {
     namespace {
-        using G2PError = wolf::Api::G2P::L1::Error;
+        using G2PError = wolf::Api::G2p::L1::Error;
         std::string_view errorCode(G2PError error) {
             switch (error) {
                 case G2PError::None: return "None";
@@ -35,7 +35,7 @@ namespace dssp::arch_diffsinger {
         }
     }
 
-    arch::SynthesisResult<arch::Pronunciation> translatePronunciation(const wolf::Api::G2P::L1::G2PWordOutput &word, const std::string &lyric) {
+    arch::SynthesisResult<arch::Pronunciation> translatePronunciation(const wolf::Api::G2p::L1::WordOutput &word, const std::string &lyric) {
         if (word.error == G2PError::InvalidInput || word.error == G2PError::PhonemeGenerationFailed) {
             return arch::Pronunciation{lyric, {lyric}};
         }
@@ -43,7 +43,7 @@ namespace dssp::arch_diffsinger {
         if (word.error != G2PError::None) {
             return fail<arch::SynthesisErrors>(arch::OperationError("Pronunciation inference failed", std::make_shared<const ExternalError>(std::string(errorCode(word.error)), NativeDiagnostic{"wolf", "G2P word conversion", std::string(errorCode(word.error))})));
         }
-        using Mode = wolf::Api::G2P::L1::Mode;
+        using Mode = wolf::Api::G2p::L1::Mode;
         if (word.mode == Mode::Skip) {
             return arch::Pronunciation{};
         }
@@ -63,8 +63,8 @@ namespace dssp::arch_diffsinger {
         // pronunciation, rather than offering individual phonemes as alternatives.
         const auto tokens = stdc::str::split(std::string_view(result.pronunciation), " ");
         if (!result.pronunciation.empty() && !result.candidates.empty() && std::ranges::all_of(result.candidates, [&](const auto &candidate) {
-            return candidate.find(' ') != std::string::npos ? candidate == result.pronunciation : std::ranges::find(tokens, std::string_view(candidate)) != tokens.end();
-        })) {
+                return candidate.find(' ') != std::string::npos ? candidate == result.pronunciation : std::ranges::find(tokens, std::string_view(candidate)) != tokens.end();
+            })) {
             result.candidates = {result.pronunciation};
         }
         if (word.mode == Mode::Convert && !result.pronunciation.empty()) {

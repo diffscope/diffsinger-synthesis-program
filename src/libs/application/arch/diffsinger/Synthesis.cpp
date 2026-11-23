@@ -10,6 +10,11 @@
 #include <type_traits>
 #include <utility>
 
+#include <dsinfer/Api/Inferences/Acoustic/1/AcousticOnnxApiL1.h>
+#include <dsinfer/Api/Inferences/Duration/1/DurationOnnxApiL1.h>
+#include <dsinfer/Api/Inferences/Pitch/1/PitchOnnxApiL1.h>
+#include <dsinfer/Api/Inferences/Variance/1/VarianceOnnxApiL1.h>
+#include <dsinfer/Api/Inferences/Vocoder/1/VocoderOnnxApiL1.h>
 #include <dsinfer/Api/Singers/DiffSinger/1/DiffSingerApiL1.h>
 #include <stdcorelib/str.h>
 #include <stdcorelib/support/logging.h>
@@ -28,7 +33,7 @@ namespace dssp::arch_diffsinger {
         namespace Vo = ds::Api::Vocoder::L1;
         stdc::LogCategory log("dssp.arch_diffsinger.Synthesis");
 
-        arch::SynthesisResult<std::size_t> acousticFrames(const Ac::AcousticResult &result, int channels, const std::string &singer) {
+        arch::SynthesisResult<std::size_t> acousticFrames(const Ac::Result &result, int channels, const std::string &singer) {
             const auto invalid = [&](std::string message) -> arch::SynthesisResult<std::size_t> { return fail<arch::SynthesisErrors>(arch::OperationError(std::move(message) + " for singer " + singer)); };
             // Only tensor backend calls cross this exception boundary.
             try {
@@ -131,15 +136,18 @@ namespace dssp::arch_diffsinger {
 
             template <class Executive, class Input>
             auto infer(SynthesisStage stage, std::shared_ptr<Input> input) -> drogon::Task<inference::ExecutionResult<typename decltype(std::declval<Executive &>().start(std::declval<const Input &>()))::value_type>> {
-                if (stop.stop_requested()) co_return fail<inference::ExecutionErrors>(inference::CancelledError("DiffSinger synthesis request was cancelled"));
+                if (stop.stop_requested())
+                    co_return fail<inference::ExecutionErrors>(inference::CancelledError("DiffSinger synthesis request was cancelled"));
                 const auto pool = catalog->environment()->inferences(synthesisCacheGroup(stage));
-                if (!pool) co_return fail<inference::ExecutionErrors>(inference::ExecutionError("Synthesis cache group is unavailable for stage " + std::string(stageName(stage)), pool.error().clone()));
+                if (!pool)
+                    co_return fail<inference::ExecutionErrors>(inference::ExecutionError("Synthesis cache group is unavailable for stage " + std::string(stageName(stage)), pool.error().clone()));
                 auto handle = bindSynthesis(**pool, singer(), stage);
-                if (!handle) co_return fail<inference::ExecutionErrors>(std::move(handle.error()));
+                if (!handle)
+                    co_return fail<inference::ExecutionErrors>(std::move(handle.error()));
                 log.stdcTrace("Submitting %1 inference for singer %2 (piece=%3 seconds)", stageName(stage), singer().info.id, duration);
                 auto result = co_await (*pool)->runCoro<Executive>(*handle, stop, [input](auto &executive) {
                     auto output = executive.start(*input);
-                    if constexpr (std::is_same_v<Executive, Ac::AcousticExecutive>) {
+                    if constexpr (std::is_same_v<Executive, Ac::Executive>) {
                         // Preserve native tensor storage before releasing the lease.
                         if (output && *output) {
                             if ((*output)->mel) (*output)->mel = (*output)->mel->clone();
@@ -147,9 +155,9 @@ namespace dssp::arch_diffsinger {
                         }
                     }
 
-                    return output;
-                }, progress);
-                if (!(co_await background())) co_return fail<inference::ExecutionErrors>(inference::CancelledError("DiffSinger continuation was cancelled"));
+                    return output; }, progress);
+                if (!(co_await background()))
+                    co_return fail<inference::ExecutionErrors>(inference::CancelledError("DiffSinger continuation was cancelled"));
                 co_return std::move(result);
             }
 
@@ -255,7 +263,7 @@ namespace dssp::arch_diffsinger {
                         return std::unexpected{std::move(converted.error())};
                     }
                     varianceScore = std::move(*converted);
-                    const auto *schema = dynamic_cast<const Va::VarianceSchema *>(singer().stages.at("variance").spec->exports());
+                    const auto *schema = dynamic_cast<const Va::Exports *>(singer().stages.at("variance").spec->exports());
                     if (!schema) {
                         return fail<arch::SynthesisErrors>(arch::OperationError("Missing variance output schema for singer " + singer().info.id));
                     }
@@ -329,7 +337,7 @@ namespace dssp::arch_diffsinger {
                     co_return;
                 }
 
-                auto task = std::make_shared<Pi::PitchStartInput>();
+                auto task = std::make_shared<Pi::StartInput>();
                 task->duration = duration;
                 task->steps = context.options.steps.pitch;
                 task->words = std::move(pitchScore.words);
@@ -339,7 +347,7 @@ namespace dssp::arch_diffsinger {
                     task->parameters.push_back(curves.at("expressiveness"));
                 }
 
-                auto result = co_await infer<Pi::PitchExecutive>(SynthesisStage::Pitch, task);
+                auto result = co_await infer<Pi::Executive>(SynthesisStage::Pitch, task);
                 if (!result) {
                     finish(std::unexpected{synthesisExecutionError(result.error(), "pitch", singer())});
                     co_return;
@@ -369,8 +377,8 @@ namespace dssp::arch_diffsinger {
                 }
 
                 const auto &stage = singer().stages.at("variance");
-                const auto *configuration = dynamic_cast<const Va::VarianceConfiguration *>(stage.spec->configuration());
-                const auto *schema = dynamic_cast<const Va::VarianceSchema *>(stage.spec->exports());
+                const auto *configuration = dynamic_cast<const Va::Onnx::Configuration *>(stage.spec->configuration());
+                const auto *schema = dynamic_cast<const Va::Exports *>(stage.spec->exports());
                 if (!configuration || !schema) {
                     finish(fail<arch::SynthesisErrors>(arch::OperationError("Missing typed variance configuration for singer " + singer().info.id)));
                     co_return;
@@ -383,7 +391,7 @@ namespace dssp::arch_diffsinger {
                     co_return;
                 }
 
-                auto task = std::make_shared<Va::VarianceStartInput>();
+                auto task = std::make_shared<Va::StartInput>();
                 task->duration = duration;
                 task->steps = context.options.steps.variance;
                 task->words = std::move(varianceScore.words);
@@ -393,7 +401,7 @@ namespace dssp::arch_diffsinger {
                     task->parameters.push_back(curves.at(tag.name()));
                 }
 
-                auto result = co_await infer<Va::VarianceExecutive>(SynthesisStage::Variance, task);
+                auto result = co_await infer<Va::Executive>(SynthesisStage::Variance, task);
                 if (!result) {
                     finish(std::unexpected{synthesisExecutionError(result.error(), "variance", singer())});
                     co_return;
@@ -459,7 +467,7 @@ namespace dssp::arch_diffsinger {
                     return std::unexpected{std::move(valid.error())};
                 }
 
-                const auto *vocoderConfiguration = dynamic_cast<const Vo::VocoderConfiguration *>(singer().stages.at("vocoder").spec->configuration());
+                const auto *vocoderConfiguration = dynamic_cast<const Vo::Onnx::Configuration *>(singer().stages.at("vocoder").spec->configuration());
                 const double sampleCount = std::round(duration * vocoderConfiguration->sampleRate);
                 if (!std::isfinite(sampleCount) || sampleCount > media::maximumWaveSampleCount) {
                     return fail<arch::SynthesisErrors>(arch::InvalidInputError(context.locale.text("diffsinger.synth_audio_wav_size_exceeded", "Piece duration exceeds the float32 RIFF WAV output limit")));
@@ -497,7 +505,7 @@ namespace dssp::arch_diffsinger {
                     return;
                 }
 
-                const auto *configuration = dynamic_cast<const Vo::VocoderConfiguration *>(singer().stages.at("vocoder").spec->configuration());
+                const auto *configuration = dynamic_cast<const Vo::Onnx::Configuration *>(singer().stages.at("vocoder").spec->configuration());
                 auto url = media::waveDataUrl(pcm, configuration->sampleRate, duration);
                 if (!url) {
                     finish(fail<arch::SynthesisErrors>(arch::OperationError("Cannot encode synthesized WAV for singer " + singer().info.id, url.error().clone())));
@@ -515,8 +523,8 @@ namespace dssp::arch_diffsinger {
                     co_return;
                 }
 
-                const auto *configuration = dynamic_cast<const Ac::AcousticConfiguration *>(singer().stages.at("acoustic").spec->configuration());
-                const auto *schema = dynamic_cast<const Ac::AcousticSchema *>(singer().stages.at("acoustic").spec->exports());
+                const auto *configuration = dynamic_cast<const Ac::Onnx::Configuration *>(singer().stages.at("acoustic").spec->configuration());
+                const auto *schema = dynamic_cast<const Ac::Exports *>(singer().stages.at("acoustic").spec->exports());
                 const auto tone = curves.find("tone_shift");
                 auto pitch = effectivePitch(curves.at("pitch"), tone == curves.end() ? nullptr : &tone->second, duration, static_cast<double>(configuration->hopSize) / configuration->sampleRate);
                 if (!pitch) {
@@ -524,7 +532,7 @@ namespace dssp::arch_diffsinger {
                     co_return;
                 }
 
-                auto task = std::make_shared<Ac::AcousticStartInput>();
+                auto task = std::make_shared<Ac::StartInput>();
                 task->duration = duration;
                 task->steps = context.options.steps.acoustic;
                 task->depth = context.options.depth;
@@ -540,7 +548,7 @@ namespace dssp::arch_diffsinger {
                     }
                 }
 
-                auto result = co_await infer<Ac::AcousticExecutive>(SynthesisStage::Acoustic, task);
+                auto result = co_await infer<Ac::Executive>(SynthesisStage::Acoustic, task);
                 if (!result) {
                     finish(std::unexpected{synthesisExecutionError(result.error(), "acoustic", singer())});
                 } else if (!*result) {
@@ -550,13 +558,13 @@ namespace dssp::arch_diffsinger {
                 }
             }
 
-            drogon::Task<> vocoder(std::unique_ptr<Ac::AcousticResult> result) {
+            drogon::Task<> vocoder(std::unique_ptr<Ac::Result> result) {
                 if (cancelled()) {
                     co_return;
                 }
 
-                const auto *configuration = dynamic_cast<const Ac::AcousticConfiguration *>(singer().stages.at("acoustic").spec->configuration());
-                const auto *vocoderConfiguration = dynamic_cast<const Vo::VocoderConfiguration *>(singer().stages.at("vocoder").spec->configuration());
+                const auto *configuration = dynamic_cast<const Ac::Onnx::Configuration *>(singer().stages.at("acoustic").spec->configuration());
+                const auto *vocoderConfiguration = dynamic_cast<const Vo::Onnx::Configuration *>(singer().stages.at("vocoder").spec->configuration());
                 const auto frames = acousticFrames(*result, configuration->melChannels, singer().info.id);
                 if (!frames) {
                     finish(std::unexpected{frames.error()});
@@ -564,7 +572,7 @@ namespace dssp::arch_diffsinger {
                 }
 
                 progress.advance(0.9);
-                auto task = std::make_shared<Vo::VocoderStartInput>();
+                auto task = std::make_shared<Vo::StartInput>();
                 task->mel = std::move(result->mel);
                 if (vocoderConfiguration->pitchControllable && curves.contains("tone_shift")) {
                     auto f0 = vocoderF0(curves.at("pitch"), *frames, static_cast<double>(configuration->hopSize) / configuration->sampleRate);
@@ -588,7 +596,7 @@ namespace dssp::arch_diffsinger {
                     co_return;
                 }
 
-                auto output = co_await infer<Vo::VocoderExecutive>(SynthesisStage::Vocoder, task);
+                auto output = co_await infer<Vo::Executive>(SynthesisStage::Vocoder, task);
                 if (!output) {
                     finish(std::unexpected{synthesisExecutionError(output.error(), "vocoder", singer())});
                 } else if (!*output) {
@@ -609,7 +617,8 @@ namespace dssp::arch_diffsinger {
         }
 
         drogon::async_run([request, input = std::move(input)]() -> drogon::Task<> {
-            if (!(co_await request->background())) co_return;
+            if (!(co_await request->background()))
+                co_return;
             if (request->cancelled()) {
                 co_return;
             }
@@ -642,10 +651,10 @@ namespace dssp::arch_diffsinger {
                 co_return;
             }
 
-            auto task = std::make_shared<Du::DurationStartInput>();
+            auto task = std::make_shared<Du::StartInput>();
             task->duration = input.piece.pieceDuration;
             task->words = std::move(score->words);
-            auto result = co_await request->infer<Du::DurationExecutive>(SynthesisStage::Duration, task);
+            auto result = co_await request->infer<Du::Executive>(SynthesisStage::Duration, task);
             if (!result) {
                 request->finish(std::unexpected{synthesisExecutionError(result.error(), "duration", request->singer())});
             } else if (!*result) {
@@ -666,10 +675,13 @@ namespace dssp::arch_diffsinger {
 
         request->input = std::move(input);
         drogon::async_run([request]() -> drogon::Task<> {
-            if (!(co_await request->background())) co_return;
+            if (!(co_await request->background()))
+                co_return;
             auto valid = request->prepareParameters();
-            if (!valid) request->finish(std::unexpected{std::move(valid.error())});
-            else co_await request->pitch();
+            if (!valid)
+                request->finish(std::unexpected{std::move(valid.error())});
+            else
+                co_await request->pitch();
         });
     }
 
@@ -682,10 +694,13 @@ namespace dssp::arch_diffsinger {
 
         request->input = std::move(input);
         drogon::async_run([request]() -> drogon::Task<> {
-            if (!(co_await request->background())) co_return;
+            if (!(co_await request->background()))
+                co_return;
             auto valid = request->prepareAudio();
-            if (!valid) request->finish(std::unexpected{std::move(valid.error())});
-            else co_await request->acoustic();
+            if (!valid)
+                request->finish(std::unexpected{std::move(valid.error())});
+            else
+                co_await request->acoustic();
         });
     }
 }

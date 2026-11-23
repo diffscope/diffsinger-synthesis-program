@@ -10,7 +10,6 @@
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <stdcorelib/path.h>
-
 #include <synthrt/Core/ContribImportBinding.h>
 #include <synthrt/Core/ContribLocator.h>
 
@@ -80,10 +79,7 @@ namespace dssp::inference {
                     // Insert first to represent shared/cyclic edges by identity.
                     nodes.emplace(id, srt::JsonValue{});
                     nodes[id] = srt::JsonObject{
-                        {"interface", target.interfaceId()}, {"variant", target.variant()}, {"level", target.level()},
-                        {"configuration", resourcePaths(target.manifestConfiguration(), target)}, {"exports", resourcePaths(target.manifestExports(), target)},
-                        {"imports", importsOf(target, nodes, false)}
-                    };
+                        {"interface", target.triplet().interfaceId()}, {"variant", target.triplet().variant()}, {"level", target.triplet().level()}, {"configuration", resourcePaths(target.manifestConfiguration(), target)}, {"exports", resourcePaths(target.manifestExports(), target)}, {"imports", importsOf(target, nodes, false)}};
                 }
             }
 

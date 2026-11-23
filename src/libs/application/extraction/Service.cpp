@@ -10,8 +10,8 @@
 
 #include <dsspextraction/ExtractorCatalog.h>
 #include <dsspextraction/Results.h>
-#include <dsspextraction/Slicing.h>
 #include <dsspextraction/Separation.h>
+#include <dsspextraction/Slicing.h>
 #include <dsspextraction/Tempo.h>
 #include <dsspmedia/Wave.h>
 #include <dsspresource/TaskExecutor.h>
@@ -41,8 +41,10 @@ namespace dssp::extraction {
             std::vector<SampleSpan> spans;
 
             void finish(ExtractionResult<Output> result) {
-                if (done.test_and_set(std::memory_order_acq_rel)) return;
-                if (stop.stop_requested()) result = fail<ExtractionErrors>(CancelledError(locale.text("extraction.extraction_request_cancelled_for_extractor", "Extraction request was canceled for extractor {0}", record.id)));
+                if (done.test_and_set(std::memory_order_acq_rel))
+                    return;
+                if (stop.stop_requested())
+                    result = fail<ExtractionErrors>(CancelledError(locale.text("extraction.extraction_request_cancelled_for_extractor", "Extraction request was canceled for extractor {0}", record.id)));
                 complete(std::move(result));
             }
 
@@ -59,8 +61,10 @@ namespace dssp::extraction {
         drogon::Task<bool> background(std::shared_ptr<Request<Output>> request) {
             auto ready = co_await request->tasks->resume(request->stop.get_token());
             if (!ready) {
-                if (ready.error().template get_if<resource::TaskCancelledError>()) request->finish(fail<ExtractionErrors>(CancelledError(request->locale.text("extraction.extraction_background_cancelled", "Extraction background task was canceled"))));
-                else request->finish(fail<ExtractionErrors>(OperationError(request->locale.text("extraction.extraction_background_failed", "Cannot execute extraction background task"), ready.error().asError().clone())));
+                if (ready.error().template get_if<resource::TaskCancelledError>())
+                    request->finish(fail<ExtractionErrors>(CancelledError(request->locale.text("extraction.extraction_background_cancelled", "Extraction background task was canceled"))));
+                else
+                    request->finish(fail<ExtractionErrors>(OperationError(request->locale.text("extraction.extraction_background_failed", "Cannot execute extraction background task"), ready.error().asError().clone())));
                 co_return false;
             }
             if (request->stop.stop_requested()) {
@@ -95,7 +99,7 @@ namespace dssp::extraction {
             audio.sampleRate = decoded->sampleRate;
             audio.channelCount = decoded->channelCount;
             audio.samples = std::move(decoded->samples);
-            auto mono = inference::nativeCall("Otter prepareSamples", [&] { return otter::prepareSamples(audio, request->record.sampleRate, 1, 0); });
+            auto mono = inference::nativeCall("Otter prepareSamples", [&] { return otter::PreparedSamples::prepare(audio, request->record.sampleRate, 1, 0); });
             if (!mono) {
                 request->finish(fail<ExtractionErrors>(OperationError(request->locale.text("extraction.extractor_audio_prepare_failed", "Cannot prepare audio for extractor {0}", request->record.id), mono.error().clone())));
                 return false;
@@ -133,11 +137,14 @@ namespace dssp::extraction {
             const auto request = std::make_shared<Request<Output>>(std::move(catalog), record, std::move(tasks), stop, std::move(input.locale), std::move(complete));
             request->progress = input.progress;
             drogon::async_run([request, input = std::move(input), threshold, convert = std::move(convert)]() mutable -> drogon::Task<> {
-                if (!(co_await background(request))) co_return;
-                if (!prepare(request, input.audioUrl, threshold)) co_return;
+                if (!(co_await background(request)))
+                    co_return;
+                if (!prepare(request, input.audioUrl, threshold))
+                    co_return;
                 input.audioUrl.clear();
                 inference::ExecutionResult<std::vector<std::unique_ptr<ResultType>>> result{std::vector<std::unique_ptr<ResultType>>{}};
-                if (!request->spans.empty()) result = co_await request->record.pool->template useCoro<Executive>(request->record.resource, request->stop.get_token(), [request](Executive &executive, std::stop_token token) -> inference::ExecutionResult<std::vector<std::unique_ptr<ResultType>>> {
+                if (!request->spans.empty())
+                    result = co_await request->record.pool->template useCoro<Executive>(request->record.resource, request->stop.get_token(), [request](Executive &executive, std::stop_token token) -> inference::ExecutionResult<std::vector<std::unique_ptr<ResultType>>> {
                     std::vector<std::unique_ptr<ResultType>> results;
                     results.reserve(request->spans.size());
                     std::size_t totalFrames = 0;
@@ -154,7 +161,7 @@ namespace dssp::extraction {
                         const auto length = span.end - span.begin;
                         native.progress = [request, completedFrames, length, totalFrames, token](double value) {
                             if (token.stop_requested() || request->stop.stop_requested()) return false;
-                            if constexpr (std::is_same_v<ResultType, Note::NoteResult>) {
+                            if constexpr (std::is_same_v<ResultType, Note::Result>) {
                                 // Complete spans require successful result validation.
                                 if (std::isfinite(value) && value >= 0 && value < 1) request->progress.advance((completedFrames + length * value) / totalFrames);
                             }
@@ -168,7 +175,7 @@ namespace dssp::extraction {
                         if (executive.state() == srt::ITask::Canceled) return fail<inference::ExecutionErrors>(inference::CancelledError("Otter analyzer was cancelled"));
                         const auto start = static_cast<double>(span.begin) / request->record.sampleRate;
                         const auto end = static_cast<double>(span.end) / request->record.sampleRate;
-                        if constexpr (std::is_same_v<ResultType, Note::NoteResult>) {
+                        if constexpr (std::is_same_v<ResultType, Note::Result>) {
                             for (const auto &note : (*result)->notes) {
                                 if (note.start < start - 1e-5 || note.start + note.duration > end + 1e-5) return fail<inference::ExecutionErrors>(inference::ExecutionError("Note timing lies outside its input span"));
                             }
@@ -184,17 +191,19 @@ namespace dssp::extraction {
                         request->progress.advance(static_cast<double>(completedFrames) / totalFrames);
                     }
 
-                    return results;
-                }, request->progress);
-                if (!(co_await background(request))) co_return;
+                    return results; }, request->progress);
+                if (!(co_await background(request)))
+                    co_return;
                 if (!result) {
                     request->failExecution(result.error());
                     co_return;
                 }
 
                 auto output = convert(*request, *result);
-                if (!output) request->finish(fail<ExtractionErrors>(OperationError(request->locale.text("extraction.extractor_model_result_invalid", "Invalid model result from extractor {0}", request->record.id), output.error().clone())));
-                else request->finish(std::move(*output));
+                if (!output)
+                    request->finish(fail<ExtractionErrors>(OperationError(request->locale.text("extraction.extractor_model_result_invalid", "Invalid model result from extractor {0}", request->record.id), output.error().clone())));
+                else
+                    request->finish(std::move(*output));
             });
         }
     }
@@ -206,11 +215,14 @@ namespace dssp::extraction {
     };
 
     std::expected<std::shared_ptr<Service>, inference::InitializationError> Service::create(std::shared_ptr<inference::Environment> environment, double threshold) {
-        if (!std::isfinite(threshold) || threshold < 0) return std::unexpected{inference::InitializationError("Invalid extraction silence threshold")};
+        if (!std::isfinite(threshold) || threshold < 0)
+            return std::unexpected{inference::InitializationError("Invalid extraction silence threshold")};
         auto catalog = ExtractorCatalog::discover(std::move(environment));
-        if (!catalog) return std::unexpected{std::move(catalog.error())};
+        if (!catalog)
+            return std::unexpected{std::move(catalog.error())};
         auto tasks = resource::TaskExecutor::create("dssp-extraction-tasks");
-        if (!tasks) return std::unexpected{inference::InitializationError("Cannot create extraction background workers", tasks.error().clone())};
+        if (!tasks)
+            return std::unexpected{inference::InitializationError("Cannot create extraction background workers", tasks.error().clone())};
         auto impl = std::make_unique<Impl>();
         impl->catalog = std::move(*catalog);
         impl->tasks = std::move(*tasks);
@@ -221,7 +233,9 @@ namespace dssp::extraction {
     Service::Service(std::unique_ptr<Impl> impl) : m_impl(std::move(impl)) {}
 
     Service::~Service() = default;
-    void Service::shutdown() { m_impl->tasks->shutdown(); }
+    void Service::shutdown() {
+        m_impl->tasks->shutdown();
+    }
 
     void Service::tempo(Input input, std::stop_token stop, Completion<TempoOutput> complete) const {
         const auto *record = m_impl->catalog->find(Kind::Tempo, input.extractor);
@@ -233,9 +247,13 @@ namespace dssp::extraction {
         extractTempo(m_impl->catalog, *record, m_impl->tasks, std::move(input), stop, std::move(complete));
     }
 
-    CatalogResult<ExtractorList> Service::extractors(const localization::Context &locale) const { return m_impl->catalog->list(locale); }
+    CatalogResult<ExtractorList> Service::extractors(const localization::Context &locale) const {
+        return m_impl->catalog->list(locale);
+    }
 
-    CatalogResult<ExtractorInfo> Service::extractor(Kind kind, std::string_view id, const localization::Context &locale) const { return m_impl->catalog->metadata(kind, id, locale); }
+    CatalogResult<ExtractorInfo> Service::extractor(Kind kind, std::string_view id, const localization::Context &locale) const {
+        return m_impl->catalog->metadata(kind, id, locale);
+    }
 
     void Service::note(Input input, std::stop_token stop, Completion<NoteOutput> complete) const {
         const auto *record = m_impl->catalog->find(Kind::Note, input.extractor);
@@ -244,13 +262,14 @@ namespace dssp::extraction {
             return;
         }
 
-        extract<Note::NoteExecutive, Note::NoteStartInput, Note::NoteResult>(m_impl->catalog, *record, m_impl->tasks, std::move(input), m_impl->threshold, stop, std::move(complete), [](const auto &request, const auto &results) -> std::expected<NoteOutput, OperationError> {
-            std::vector<Note::NoteInfo> notes;
+        extract<Note::Executive, Note::StartInput, Note::Result>(m_impl->catalog, *record, m_impl->tasks, std::move(input), m_impl->threshold, stop, std::move(complete), [](const auto &request, const auto &results) -> std::expected<NoteOutput, OperationError> {
+            std::vector<Note::Info> notes;
             for (std::size_t index = 0; index < results.size(); ++index) {
                 const auto start = static_cast<double>(request.spans[index].begin) / request.record.sampleRate;
                 const auto end = static_cast<double>(request.spans[index].end) / request.record.sampleRate;
                 for (const auto &note : results[index]->notes) {
-                    if (note.start < start - 1e-5 || note.start + note.duration > end + 1e-5) return std::unexpected{OperationError("Note timing lies outside input span " + std::to_string(index))};
+                    if (note.start < start - 1e-5 || note.start + note.duration > end + 1e-5)
+                        return std::unexpected{OperationError("Note timing lies outside input span " + std::to_string(index))};
                     notes.push_back(note);
                 }
             }
@@ -266,13 +285,14 @@ namespace dssp::extraction {
             return;
         }
 
-        extract<F0::F0Executive, F0::F0StartInput, F0::F0Result>(m_impl->catalog, *record, m_impl->tasks, std::move(input), m_impl->threshold, stop, std::move(complete), [](const auto &request, const auto &results) -> std::expected<PitchOutput, OperationError> {
+        extract<F0::Executive, F0::StartInput, F0::Result>(m_impl->catalog, *record, m_impl->tasks, std::move(input), m_impl->threshold, stop, std::move(complete), [](const auto &request, const auto &results) -> std::expected<PitchOutput, OperationError> {
             PitchBuilder builder(request.record.outputInterval);
             for (std::size_t index = 0; index < results.size(); ++index) {
                 const auto start = static_cast<double>(request.spans[index].begin) / request.record.sampleRate;
                 const auto end = static_cast<double>(request.spans[index].end) / request.record.sampleRate;
                 auto appended = builder.append(*results[index], start, end, request.record.sampleRate);
-                if (!appended) return std::unexpected{std::move(appended.error())};
+                if (!appended)
+                    return std::unexpected{std::move(appended.error())};
             }
 
             return builder.take();

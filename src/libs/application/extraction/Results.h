@@ -7,11 +7,11 @@
 #include <dsspextraction/Types.h>
 
 namespace dssp::extraction {
-    std::expected<NoteOutput, OperationError> noteOutput(std::vector<otter::Api::Note::L1::NoteInfo>, double duration);
+    std::expected<NoteOutput, OperationError> noteOutput(std::vector<otter::Api::Note::L1::Info>, double duration);
     class PitchBuilder {
     public:
         explicit PitchBuilder(double interval) : m_interval(interval) { m_output.sampleRate = 1.0 / interval; }
-        std::expected<void, OperationError> append(const otter::Api::F0::L1::F0Result &, double spanStart, double spanEnd, int audioSampleRate);
+        std::expected<void, OperationError> append(const otter::Api::F0::L1::Result &, double spanStart, double spanEnd, int audioSampleRate);
         PitchOutput take() { return std::move(m_output); }
 
     private:

@@ -1,0 +1,16 @@
+{
+    "manifest-dir": "vcpkg-manifest",
+    "vcpkg": {
+        "repository": "https://github.com/microsoft/vcpkg.git",
+        "ref": "0c2a9ace1964b818b15f7ae50ba1c42404918a7b"
+    },
+    "overlays": [
+        {
+            "path": "vcpkg-overrides"
+        },
+        {
+            "repository": "../../stdware/vcpkg-overlay.git",
+            "ref": "main"
+        }
+    ]
+}

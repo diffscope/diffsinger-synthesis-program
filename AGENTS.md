@@ -18,7 +18,7 @@ DSSP (DiffSinger Synthesis Program) is a C++23 command-line service for singing 
 - `src/libs/3rdparty/`: repository-managed SynthRT extensions `srtsepinfer` and `srtbeatinfer`, including their shared APIs, DSP code, and inference-interpreter plugins. These directories are not Git submodules. Preserve their separate API, namespace, build, and license boundaries.
 - `src/tests/`: Google Test suites, fixtures, and test translation resources. `docs/open-api/1.0.json` describes the HTTP API surface represented by this service.
 - `src/conf.cmake` and `cmake/`: build layout, plugin deployment, dependency deployment, and runtime checks.
-- `scripts/vcpkg-manifest/`: dependency manifest. `scripts/vcpkg-overrides/` contains project-specific pinned ports. `scripts/vcpkg/` is the overlay ports/triplets Git submodule. Treat that submodule as an upstream project and keep submodule edits separate from ordinary feature changes.
+- `scripts/vcpkg-manifest/`: dependency manifest. `scripts/vcpkg-overrides/ports/` holds the project-specific pinned ports and `scripts/vcpkg-overrides/triplets/` the project triplets. `scripts/vcpkg-sources.json` names the vcpkg commit and the overlays, and `vcpkg-workspace.cmake` from https://github.com/stdware/dev-scripts prepares the dependency tree under `deps/`. There is no submodule.
 - `scripts/ci/` and `.github/`: packaging scripts and CI workflows. Inspect the current scripts before relying on their parameters or behavior.
 
 Never commit generated files from `build/`, `cmake-build-*`, `out/`, synchronized include trees, compiled ICU resources, or local dependency installations. Keep local model packages, audio, and other development data out of the diff.
@@ -207,7 +207,7 @@ There is no numeric coverage gate. Report exact checks performed and their resul
 - Every commit must build and pass its tests on its own, including the intermediate states created by splitting. This requirement does not authorize execution without an explicit user request. Report any unperformed checks.
 - **Do not commit without the author's authorization, and above all do not push without it.** Leave the changes in the working tree until the author approves the commit.
 
-A pull request must explain the user-visible result, affected modules, architecture/API choices, compatibility decisions, and commands/tests run. Link relevant issues. Call out HTTP endpoints and schemas, CLI options, environment variables, localization resources, dependency/license changes, and submodule pointer changes when affected. Keep unrelated formatting, generated output, and local configuration out of the diff.
+A pull request must explain the user-visible result, affected modules, architecture/API choices, compatibility decisions, and commands/tests run. Link relevant issues. Call out HTTP endpoints and schemas, CLI options, environment variables, localization resources, and dependency/license changes when affected. Keep unrelated formatting, generated output, and local configuration out of the diff.
 
 ## Security and Configuration Boundaries
 

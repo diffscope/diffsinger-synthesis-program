@@ -10,12 +10,19 @@ DiffSinger Synthesis Program is a C++23 service that provides DiffSinger singing
 
 ## Build
 
-Requires a C++23 compiler and CMake 3.19 or later. Dependencies are managed with vcpkg. The manifest is located at `scripts/vcpkg-manifest/vcpkg.json`, with custom ports in `scripts/vcpkg-overrides` and `scripts/vcpkg/ports`.
+Requires a C++23 compiler and CMake 3.19 or later. Dependencies are managed with vcpkg. `scripts/vcpkg-sources.json` names the vcpkg commit and the overlays, the manifest is `scripts/vcpkg-manifest/vcpkg.json`, and the project-specific ports are in `scripts/vcpkg-overrides/ports`.
 
-After initializing submodules and configuring dependencies and the CMake toolchain, run:
+Install the dependencies with [vcpkg-workspace.cmake](https://github.com/stdware/dev-scripts/blob/main/docs/about-scripts/vcpkg-workspace.md), downloaded into `scripts/`. The script checks out vcpkg and the overlays that `scripts/vcpkg-sources.json` specifies into `deps/`, and installs the dependencies there.
 
 ```sh
-cmake -S . -B build
+curl -fsSL -o scripts/vcpkg-workspace.cmake https://raw.githubusercontent.com/stdware/dev-scripts/main/scripts/vcpkg-workspace.cmake
+cmake -P scripts/vcpkg-workspace.cmake install
+```
+
+Then build with the vcpkg toolchain in `deps/`:
+
+```sh
+cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=deps/vcpkg/scripts/buildsystems/vcpkg.cmake
 cmake --build build --config Release
 cmake --install build --config Release --prefix installed
 ```

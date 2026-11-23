@@ -11,7 +11,7 @@ target_compile_definitions(dssp_arch_diffsinger PRIVATE DSSP_PROGRAM_VERSION="${
 
 # Keep environment tags tied to the actual dependency pins, not duplicated literals.
 foreach(_dependency IN ITEMS synthrt wolf)
-    file(STRINGS "${DSSP_SOURCE_DIR}/scripts/vcpkg-overrides/${_dependency}/portfile.cmake" _ref_line REGEX "^[ \t]*REF [0-9a-f]+$")
+    file(STRINGS "${DSSP_SOURCE_DIR}/scripts/vcpkg-overrides/ports/${_dependency}/portfile.cmake" _ref_line REGEX "^[ \t]*REF [0-9a-f]+$")
     string(REGEX REPLACE "^[ \t]*REF ([0-9a-f]+)$" "\\1" _ref "${_ref_line}")
     string(TOUPPER "${_dependency}" _dependency_upper)
     target_compile_definitions(dssp_arch_diffsinger PRIVATE "DSSP_${_dependency_upper}_REVISION=\"${_ref}\"")

@@ -71,7 +71,6 @@ jobs:
             arch: amd64
     runs-on: ${{ matrix.os }}
     env:
-      VCPKG_REF: 0c2a9ace1964b818b15f7ae50ba1c42404918a7b
       VCPKG_DISABLE_METRICS: '1'
       MACOSX_DEPLOYMENT_TARGET: '13.3'
       BUILD_DIR: ${{ github.workspace }}/build/build
@@ -89,16 +88,17 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.source_sha }}
-          submodules: recursive
 
       - name: Initialize build environment
         uses: ./.github/actions/initialize-build-environment
 
       - name: Initialize vcpkg
-        uses: ./.github/actions/initialize-vcpkg
+        id: vcpkg
+        uses: stdware/dev-scripts/actions/vcpkg-workspace@main
+        env:
+          VCPKG_KEEP_ENV_VARS: VCPKG_BUILD_TYPE;MACOSX_DEPLOYMENT_TARGET;CC;CXX
         with:
-          ref: ${{ env.VCPKG_REF }}
-          use_cache: ${{ inputs.build_type != 'nightly' && inputs.use_cache }}
+          cache: ${{ inputs.build_type != 'nightly' && inputs.use_cache }}
 
       - name: Restore CCache cache
         if: inputs.build_type != 'nightly' && inputs.use_cache && inputs.use_ccache
@@ -110,6 +110,8 @@ jobs:
             ${{ runner.os }}-ccache-
 
       - name: Build and install
+        env:
+          VCPKG_ROOT_DIR: ${{ steps.vcpkg.outputs.vcpkg-root }}
         run: |
           $expectedArch = $env:ARTIFACT_ARCH -eq 'amd64' ? 'X64' : 'ARM64'
           if ($env:RUNNER_ARCH -ne $expectedArch) {
@@ -140,6 +142,8 @@ jobs:
           key: ${{ runner.os }}-ccache-${{ inputs.source_sha }}
 
       - name: Collect symbol files
+        env:
+          VCPKG_ROOT_DIR: ${{ steps.vcpkg.outputs.vcpkg-root }}
         run: |
           $output = & ./scripts/ci/Collect-Symbol-Files.ps1 `
             -VcpkgRootDir $env:VCPKG_ROOT_DIR `

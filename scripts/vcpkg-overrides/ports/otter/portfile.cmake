@@ -3,7 +3,7 @@
 vcpkg_from_git(
     OUT_SOURCE_PATH SOURCE_PATH
     URL https://github.com/diffscope/otter.git
-    REF 192c3a307df0dd4fa84258eb71c3498d015c60c3
+    REF 9248c3cdef1921705e208813d409effee45fddcb
     HEAD_REF main
 )
 
@@ -15,7 +15,7 @@ vcpkg_cmake_configure(
 
 vcpkg_cmake_install()
 
-vcpkg_cmake_config_fixup(PACKAGE_NAME otter CONFIG_PATH lib/cmake/otter)
+vcpkg_cmake_config_fixup(PACKAGE_NAME synthrt-otter CONFIG_PATH lib/cmake/synthrt-otter)
 
 # The plugins install under lib/plugins/otter/<category>/<name>/, which is a search path the host hands to SynthUnit rather than a link target, so vcpkg's usual expectations about lib/ do not apply to them.
 set(VCPKG_POLICY_ALLOW_DLLS_IN_LIB enabled)

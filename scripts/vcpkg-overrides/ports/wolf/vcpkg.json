@@ -2,6 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
   "name": "wolf",
   "version": "0.4.0.0",
+  "port-version": 1,
   "description": [
     "Orchestratable Linguistic Framework: the linguist contribution category layered on synthrt."
   ],

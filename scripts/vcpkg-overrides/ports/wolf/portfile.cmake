@@ -3,7 +3,7 @@
 vcpkg_from_git(
     OUT_SOURCE_PATH SOURCE_PATH
     URL https://github.com/diffscope/wolf.git
-    REF 6ef9934cc3385e1beaf6e2c9ca1b4efef072c01e
+    REF 709b312d6326d838132d8f8b75178cc9d5fd028b
     HEAD_REF main
 )
 
@@ -15,7 +15,7 @@ vcpkg_cmake_configure(
 
 vcpkg_cmake_install()
 
-vcpkg_cmake_config_fixup(PACKAGE_NAME wolf CONFIG_PATH lib/cmake/wolf)
+vcpkg_cmake_config_fixup(PACKAGE_NAME synthrt-wolf CONFIG_PATH lib/cmake/synthrt-wolf)
 
 # The plugins install under lib/plugins/wolf/<category>/<name>/, which is a search path the host hands to SynthUnit rather than a link target, so vcpkg's usual expectations about lib/ do not apply to them.
 set(VCPKG_POLICY_ALLOW_DLLS_IN_LIB enabled)
